@@ -461,14 +461,31 @@
         ];
 
         function getSchoolCount(activeStudents, schoolConfig) {
-            if (schoolConfig.title === 'Не відвідує закладів') {
-                return activeStudents.filter(s => s.school_id === 1 || !s.school || !s.school.title).length;
-            }
-            return activeStudents.filter(s => {
-                const schoolTitle = (s.school?.title || '').trim().toLowerCase();
-                return schoolConfig.match.some(m => schoolTitle === m || schoolTitle.includes(m));
-            }).length;
+    if (schoolConfig.title === 'Не відвідує закладів') {
+        return activeStudents.filter(s => {
+            // 1. Приведение к числу/строке или нестрогое сравнение (учитывает "1" и 1)
+            const isNoSchoolId = Number(s.school_id) === 1 || s.school_id == 1;
+            
+            // 2. Учитываем случаи, когда объекта school нет или у него нет title
+            const hasNoSchoolObj = !s.school || !s.school.title || s.school.title.trim() === '';
+            
+            // 3. Учитываем текстовые совпадения ("не відвідує" в title, если school заполнен)
+            const titleMatches = s.school?.title?.toLowerCase().includes('не відвідує');
+
+            return isNoSchoolId || hasNoSchoolObj || titleMatches;
+        }).length;
+    }
+
+    return activeStudents.filter(s => {
+        // Пропускаем тех, кто не ходит в заведения, чтобы они случайно не попали в другие школы
+        if (Number(s.school_id) === 1 || !s.school || !s.school.title) {
+            return false;
         }
+
+        const schoolTitle = s.school.title.trim().toLowerCase();
+        return schoolConfig.match.some(m => schoolTitle === m || schoolTitle.includes(m));
+    }).length;
+}
 
         function calculateAge(birthdayStr) {
             if (!birthdayStr) return null;
