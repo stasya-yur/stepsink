@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <title>Панель управління клубом</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+</head>
+<body>
+
+    <header class="app-header">
+        <h1 id="current-club-title">Завантаження клубу...</h1>
+        <button class="btn-icon" onclick="toggleDrawer(true)"><i class="fa-solid fa-bars"></i></button>
+    </header>
+
+    <div class="main-layout">
+        <aside class="left-sidebar">
+            <nav class="nav-tabs">
+                <button class="tab-btn active" onclick="switchTab('all', this)"><i class="fa-solid fa-users"></i> Загальна</button>
+                <button class="tab-btn" onclick="switchTab('prep', this)">Підготовча</button>
+                <button class="tab-btn" onclick="switchTab('junior', this)">Молодша</button>
+                <button class="tab-btn" onclick="switchTab('middle', this)">Середня</button>
+                <button class="tab-btn" onclick="switchTab('senior', this)">Старша</button>
+                <hr>
+                <button class="tab-btn" onclick="switchTab('stats', this)"><i class="fa-solid fa-chart-pie"></i> Статистичні дані</button>
+                <button class="tab-btn" onclick="switchTab('social', this)"><i class="fa-solid fa-hand-holding-heart"></i> Соціально незахищені</button>
+                <button class="tab-btn" onclick="switchTab('oop', this)"><i class="fa-solid fa-child-reaching"></i> ООП</button>
+                <hr>
+                <button class="tab-btn tab-archive" onclick="switchTab('archive', this)"><i class="fa-solid fa-box-archive"></i> Архів</button>
+            </nav>
+        </aside>
+
+        <main class="content-area">
+            <div class="toolbar">
+                <input type="text" id="search-input" placeholder="Пошук за ПІБ..." oninput="filterTable()">
+                <button class="btn btn-success" id="add-student-btn" onclick="openAddStudentModal()">
+                    <i class="fa-solid fa-user-plus"></i> Додати учня
+                </button>
+                <button class="btn btn-secondary" onclick="window.print()"><i class="fa-solid fa-print"></i> Друк / Зберегти PDF</button>
+            </div>
+
+            <div class="table-container" id="printable-area">
+                <h2 id="tab-heading">Загальний список учнів</h2>
+                <table class="data-table">
+                    <thead>
+                        <tr id="table-header-row"></tr>
+                    </thead>
+                    <tbody id="table-body"></tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+
+    <div class="drawer-overlay" id="drawer-overlay" onclick="toggleDrawer(false)"></div>
+    <aside class="right-drawer" id="right-drawer">
+        <div class="drawer-header">
+            Меню
+            <button class="close-btn" onclick="toggleDrawer(false)">&times;</button>
+        </div>
+        <div class="drawer-content">
+            <div class="form-group">
+                <label>Поточний клуб:</label>
+                <select id="club-select" onchange="changeClub(this.value)"></select>
+            </div>
+            <hr><br>
+            <h4 style="margin-bottom: 8px;">Створити новий клуб</h4>
+            <form id="create-club-form" style="display: flex; flex-direction: column; gap: 8px;">
+                <input type="text" id="new-club-title" placeholder="Назва клубу" required style="padding: 8px; width: 100%; box-sizing: border-box;">
+                <button type="submit" class="btn btn-success w-full"><i class="fa-solid fa-plus"></i> Додати клуб</button>
+            </form>
+            <br>
+            <hr><br>
+            <a href="profile.html" class="btn btn-primary w-full"><i class="fa-solid fa-user"></i> Особистий кабінет</a>
+            <br><br>
+            <button class="btn btn-danger w-full" onclick="logout()"><i class="fa-solid fa-right-from-bracket"></i> Вийти</button>
+        </div>
+    </aside>
+
+    <div class="modal" id="student-modal">
+        <div class="modal-content" style="max-width: 1000px;">
+            <h3 id="student-modal-title"><i class="fa-solid fa-user-plus"></i> Додати учня</h3>
+
+            <form id="student-form">
+                <div class="student-form-grid form-row-2">
+                    <div class="form-group">
+                        <div class="field-with-toggle">
+                            <div class="field-part">
+                                <label class="field-label">ПІБ учня *</label>
+                                <input type="text" id="sf-name" required>
+                            </div>
+                            <div class="toggle-part">
+                                <label class="toggle">
+                                    <span>Новоприбулий</span>
+                                    <input type="checkbox" id="sf-new" checked>
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="student-form-grid form-row-4" style="margin-top: 6px;">
+                    <div class="form-group">
+                        <label class="field-label">Дата народження *</label>
+                        <input type="date" id="sf-bithday" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="field-label">Навчальний заклад *</label>
+                        <select id="sf-school_id" required></select>
+                    </div>
+                    <div class="form-group">
+                        <label class="field-label">Стать *</label>
+                        <select id="sf-sex_id" required></select>
+                    </div>
+                    <div class="form-group">
+                        <label class="field-label">Група *</label>
+                        <select id="sf-group_id" required></select>
+                    </div>
+                </div>
+
+                <div class="student-form-grid form-row-2col" style="margin-top: 6px;">
+                    <div class="form-group">
+                        <label class="field-label">ПІБ матері</label>
+                        <input type="text" id="sf-mother">
+                    </div>
+                    <div class="form-group">
+                        <label class="field-label">Телефон матері</label>
+                        <input type="text" id="sf-mother_telephone">
+                    </div>
+                    <div class="form-group">
+                        <label class="field-label">ПІБ батька</label>
+                        <input type="text" id="sf-father">
+                    </div>
+                    <div class="form-group">
+                        <label class="field-label">Телефон батька</label>
+                        <input type="text" id="sf-father_telephone">
+                    </div>
+                </div>
+
+                <div class="student-form-grid form-row-2" style="margin-top: 6px;">
+                    <div class="form-group form-col-span-2">
+                        <label class="field-label">Домашня адреса</label>
+                        <input type="text" id="sf-address">
+                    </div>
+                </div>
+
+                <div class="student-form-grid" style="grid-template-columns: 1fr 1fr; margin-top: 6px;">
+                    <div class="form-group">
+                        <label class="field-label">Категорія</label>
+                        <input type="text" id="sf-category" placeholder="напр. ВПО, дитинбудинок...">
+                    </div>
+                    <div class="form-group">
+                        <label class="field-label">Колір рядка</label>
+                        <div class="color-picker-inline" id="sf-row-color-picker">
+                            <span class="color-dot none" data-color="none" title="Без кольору"></span>
+                            <span class="color-dot red" data-color="red" title="Червоний"></span>
+                            <span class="color-dot blue" data-color="blue" title="Синій"></span>
+                            <span class="color-dot yellow" data-color="yellow" title="Жовтий"></span>
+                            <span class="color-dot green" data-color="green" title="Зелений"></span>
+                            <span class="color-dot purple" data-color="purple" title="Фіолетовий"></span>
+                        </div>
+                        <input type="hidden" id="sf-row_color" value="none">
+                    </div>
+                </div>
+
+                <div class="student-form-grid" style="grid-template-columns: 1fr; margin-top: 6px;">
+                    <div class="form-group">
+                        <div class="toggle-group" style="justify-content: flex-start;">
+                            <label class="toggle">
+                                <span>Соц. незахищений</span>
+                                <input type="checkbox" id="sf-socially_vulnerable">
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <label class="toggle">
+                                <span>ООП</span>
+                                <input type="checkbox" id="sf-oop" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </form>
+
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeStudentModal()">Скасувати</button>
+                <button class="btn btn-primary" id="student-modal-submit-btn" onclick="submitStudentForm()">Зберегти</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="archive-modal">
+        <div class="modal-content">
+            <h3 class="text-warning"><i class="fa-solid fa-box-archive"></i> Перемістити в архів</h3>
+            <p style="margin: 15px 0;">Ви дійсно хочете перемістити учня <span id="archive-student-name"></span> в архів?</p>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeArchiveModal()">Скасувати</button>
+                <button class="btn btn-warning" id="confirm-archive-btn">Перемістити в архів</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="delete-modal">
+        <div class="modal-content">
+            <h3 class="text-danger"><i class="fa-solid fa-triangle-exclamation"></i> Попередження!</h3>
+            <p style="margin: 15px 0;">Ви дійсно хочете <strong>назавжди видалити</strong> запис про учня <span id="delete-student-name"></span> з бази даних?</p>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeDeleteModal()">Скасувати</button>
+                <button class="btn btn-danger" id="confirm-delete-btn">Видалити повністю</button>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .btn-icon-inline {
+            padding: 4px 8px;
+            font-size: 13px;
+            margin-right: 4px;
+        }
+        .action-btns {
+            white-space: nowrap;
+        }
+    </style>
+
+    <script>
+        let currentUser = null;
+        let currentClubId = null;
+        let currentTab = 'all';
+        let rawStudentsData = [];
+        let dictionaries = { school: [], sex: [], group: [] };
+        let editingStudentId = null;
+        let studentToDeleteId = null;
+        let studentToArchiveId = null;
+        const ROW_COLORS = ['none', 'red', 'blue', 'yellow', 'green', 'purple'];
+
+        function setRowColorInForm(color) {
+            const c = (color && ROW_COLORS.includes(color)) ? color : 'none';
+            document.getElementById('sf-row_color').value = c;
+            document.querySelectorAll('#sf-row-color-picker .color-dot').forEach(dot => {
+                if (dot.dataset.color === c) dot.style.outline = '2px solid #333';
+                else dot.style.outline = '';
+            });
+        }
+
+        async function saveStudentRowColor(studentId, color) {
+            const c = (color && ROW_COLORS.includes(color)) ? color : 'none';
+            try {
+                const { error } = await supabaseClient
+                    .from('students')
+                    .update({ row_color: c })
+                    .eq('id', studentId);
+                if (error) {
+                    console.warn('Не вдалося зберегти колір row_color — можливо, колонки ще немає в БД.', error.message);
+                }
+                const s = rawStudentsData.find(x => x.id === studentId);
+                if (s) s.row_color = c;
+                const tr = document.querySelector(`tr[data-student-id="${studentId}"]`);
+                if (tr) {
+                    ROW_COLORS.forEach(k => { if (k !== 'none') tr.classList.remove('row-' + k); });
+                    if (c !== 'none') tr.classList.add('row-' + c);
+                }
+            } catch (e) {
+                console.warn('Помилка зміни кольору:', e.message || e);
+            }
+        }
+
+        function calculateAge(birthdayStr) {
+            if (!birthdayStr) return '';
+            const birth = new Date(birthdayStr);
+            if (isNaN(birth.getTime())) return '';
+            const today = new Date();
+            let age = today.getFullYear() - birth.getFullYear();
+            const m = today.getMonth() - birth.getMonth();
+            if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+            return age;
+        }
+
+        function orDash(val) {
+            return (val && String(val).trim() !== '') ? val : '—';
+        }
+
+        async function loadDictionaries() {
+            const [s, sx, g] = await Promise.all([
+                supabaseClient.from('school').select('*').order('title'),
+                supabaseClient.from('sex').select('*').order('id'),
+                supabaseClient.from('group').select('*').order('id')
+            ]);
+
+            if (s.error) console.warn('school load error:', s.error.message || s.error);
+            if (sx.error) console.warn('sex load error:', sx.error.message || sx.error);
+            if (g.error) console.warn('group load error:', g.error.message || g.error);
+
+            dictionaries.school = s.data || [];
+            dictionaries.sex = sx.data || [];
+            dictionaries.group = g.data || [];
+
+            if (dictionaries.sex.length === 0) {
+                const seedSex = [{ id: 1, title: 'дівчина' }, { id: 2, title: 'хлопець' }];
+                const res = await supabaseClient.from('sex').insert(seedSex).select();
+                if (!res.error && res.data) dictionaries.sex = res.data;
+                else dictionaries.sex = seedSex;
+            }
+            if (dictionaries.group.length === 0) {
+                const seedGroup = [
+                    { id: 1, title: 'Підготовча' },
+                    { id: 2, title: 'Молодша' },
+                    { id: 3, title: 'Середня' },
+                    { id: 4, title: 'Старша' }
+                ];
+                const res = await supabaseClient.from('group').insert(seedGroup).select();
+                if (!res.error && res.data) dictionaries.group = res.data;
+                else dictionaries.group = seedGroup;
+            }
+            if (dictionaries.school.length === 0) {
+                const seedSchool = [
+                    { id: 1, title: 'Школа №1' },
+                    { id: 2, title: 'Школа №9' },
+                    { id: 3, title: 'Школа №12' },
+                    { id: 4, title: 'д/с "Сонечко"' },
+                    { id: 5, title: 'д/с "Ромашка"' }
+                ];
+                const res = await supabaseClient.from('school').insert(seedSchool).select();
+                if (!res.error && res.data) dictionaries.school = res.data;
+                else dictionaries.school = seedSchool;
+            }
+        }
+
+        function populateStudentFormSelects() {
+            const fill = (id, list, key = 'id', label = 'title') => {
+                const el = document.getElementById(id);
+                el.innerHTML = '<option value="">-- оберіть --</option>' +
+                    list.map(i => `<option value="${i[key]}">${i[label]}</option>`).join('');
+            };
+            fill('sf-school_id', dictionaries.school);
+            fill('sf-sex_id', dictionaries.sex);
+            fill('sf-group_id', dictionaries.group);
+        }
+
+        async function loadUserClubs() {
+            const { data: userLinks, error: linksError } = await supabaseClient
+                .from('user_club')
+                .select('club_id')
+                .eq('user_id', currentUser.id);
+
+            if (linksError) {
+                console.error('Помилка завантаження зв\'язків користувач-клуб:', linksError);
+                return [];
+            }
+            if (!userLinks || userLinks.length === 0) return [];
+
+            const clubIds = userLinks.map(l => l.club_id);
+            const { data: clubs, error: clubsError } = await supabaseClient
+                .from('club')
+                .select('*')
+                .in('id', clubIds);
+
+            if (clubsError) {
+                console.error('Помилка завантаження клубів:', clubsError);
+                return [];
+            }
+            return clubs || [];
+        }
+
+        function renderClubSelect(clubs) {
+            const clubSelect = document.getElementById('club-select');
+            document.getElementById('add-student-btn').style.display = clubs.length ? '' : 'none';
+
+            if (clubs.length > 0) {
+                clubSelect.innerHTML = clubs.map(c =>
+                    `<option value="${c.id}" ${c.id === currentClubId ? 'selected' : ''}>${c.title}</option>`
+                ).join('');
+                if (!currentClubId) currentClubId = clubs[0].id;
+                const currentClub = clubs.find(c => c.id === currentClubId) || clubs[0];
+                currentClubId = currentClub.id;
+                document.getElementById('current-club-title').innerText = currentClub.title;
+                fetchStudents();
+            } else {
+                clubSelect.innerHTML = '';
+                currentClubId = null;
+                document.getElementById('current-club-title').innerText = "Немає підключених клубів";
+                rawStudentsData = [];
+                renderTable();
+            }
+        }
+
+        async function fetchStudents() {
+            if (!currentClubId) {
+                rawStudentsData = [];
+                renderTable();
+                return;
+            }
+            const { data: clubLinks } = await supabaseClient
+                .from('students_club')
+                .select('student_id')
+                .eq('club_id', currentClubId);
+
+            if (!clubLinks || clubLinks.length === 0) {
+                rawStudentsData = [];
+                renderTable();
+                return;
+            }
+
+            const studentIds = clubLinks.map(l => l.student_id);
+            const { data: students, error } = await supabaseClient
+                .from('students')
+                .select('*, school(title), sex(title), group(title)')
+                .in('id', studentIds);
+
+            if (error) {
+                console.error("Помилка завантаження:", error);
+                return;
+            }
+            rawStudentsData = students || [];
+            renderTable();
+        }
+
+        function switchTab(tab, btn) {
+            currentTab = tab;
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            if (btn) btn.classList.add('active');
+            renderTable();
+        }
+
+        function renderTable() {
+            const header = document.getElementById('table-header-row');
+            const tbody = document.getElementById('table-body');
+            const heading = document.getElementById('tab-heading');
+
+            let filtered = rawStudentsData;
+
+            if (currentTab === 'archive') {
+                filtered = filtered.filter(s => s.arhive === true);
+                heading.innerText = "Архівний список";
+            } else if (currentTab === 'stats') {
+                heading.innerText = "Статистичні дані";
+            } else {
+                filtered = filtered.filter(s => s.arhive !== true);
+                if (currentTab === 'prep') filtered = filtered.filter(s => s.group?.title === 'Підготовча');
+                else if (currentTab === 'junior') filtered = filtered.filter(s => s.group?.title === 'Молодша');
+                else if (currentTab === 'middle') filtered = filtered.filter(s => s.group?.title === 'Середня');
+                else if (currentTab === 'senior') filtered = filtered.filter(s => s.group?.title === 'Старша');
+                else if (currentTab === 'social') filtered = filtered.filter(s => s.socially_vulnerable === true);
+                else if (currentTab === 'oop') filtered = filtered.filter(s => s.oop === true);
+                heading.innerText = "Список учнів";
+            }
+
+            if (currentTab === 'stats') {
+                renderStatsView(header, tbody, filtered, rawStudentsData.filter(s => s.arhive !== true));
+                filterTable();
+                return;
+            }
+
+            const isArchive = currentTab === 'archive';
+
+            header.innerHTML = `
+                <th>ID</th>
+                <th>ПІБ</th>
+                <th>Новоприбулі</th>
+                <th>Вік (років)</th>
+                <th>Дата народження</th>
+                <th>Навчальний заклад</th>
+                <th>Стать</th>
+                <th>Група</th>
+                <th>Мати</th>
+                <th>Батько</th>
+                <th>Домашня адреса</th>
+                <th>Категорія</th>
+                <th>Дії</th>
+            `;
+
+            tbody.innerHTML = filtered.map((s, idx) => {
+                const motherLine = [s.mother, s.mother_telephone].filter(x => x && x.trim()).join(' ');
+                const fatherLine = [s.father, s.father_telephone].filter(x => x && x.trim()).join(' ');
+                const rowColor = (s.row_color && ROW_COLORS.includes(s.row_color) && s.row_color !== 'none')
+                    ? 'row-' + s.row_color : '';
+                const dotColors = ['none', 'red', 'blue', 'yellow', 'green', 'purple'];
+                const quickColorDots = dotColors.map(c => {
+                    const tt = c === 'none' ? 'Без кольору' :
+                        (c === 'red' ? 'Червоний' :
+                         c === 'blue' ? 'Синій' :
+                         c === 'yellow' ? 'Жовтий' :
+                         c === 'green' ? 'Зелений' : 'Фіолетовий');
+                    return `<span class="color-dot ${c}" title="${tt}" onclick="saveStudentRowColor(${s.id}, '${c}')"></span>`;
+                }).join('');
+                return `
+                <tr data-student-id="${s.id}" class="${rowColor}">
+                    <td>${s.id}</td>
+                    <td><strong>${s.name}</strong></td>
+                    <td>${s.new ? 'н/п' : ''}</td>
+                    <td>${calculateAge(s.bithday)}</td>
+                    <td>${s.bithday || ''}</td>
+                    <td>${orDash(s.school?.title)}</td>
+                    <td>${orDash(s.sex?.title)}</td>
+                    <td>${orDash(s.group?.title)}</td>
+                    <td>${orDash(motherLine)}</td>
+                    <td>${orDash(fatherLine)}</td>
+                    <td>${orDash(s.address)}</td>
+                    <td>${orDash(s.category)}</td>
+                    <td class="action-btns">
+                        <div class="color-dots" title="Колір рядка">${quickColorDots}</div>
+                        <div style="margin-top: 4px;">
+                            ${isArchive ? `
+                                <button class="btn btn-danger btn-icon-inline" onclick="openDeleteModal(${s.id}, '${s.name.replace(/'/g, "\\'")}')">
+                                    <i class="fa-solid fa-trash"></i> Видалити
+                                </button>
+                            ` : `
+                                <button class="btn btn-primary btn-icon-inline" onclick="openEditStudentModal(${s.id})">
+                                    <i class="fa-solid fa-pen"></i> Редагувати
+                                </button>
+                                <button class="btn btn-warning btn-icon-inline" onclick="openArchiveModal(${s.id}, '${s.name.replace(/'/g, "\\'")}')">
+                                    <i class="fa-solid fa-box-archive"></i> Архів
+                                </button>
+                            `}
+                        </div>
+                    </td>
+                </tr>`;
+            }).join('');
+
+            filterTable();
+        }
+
+        function renderStatsView(header, tbody, currentFiltered, activeStudents) {
+            header.innerHTML = '<th>Показник</th><th>Значення</th>';
+            const total = activeStudents.length;
+            const countBy = (list, predicate) => list.filter(predicate).length;
+            const stats = [
+                ['Всього активних учнів', total],
+                ['Новоприбулих (н/п)', countBy(activeStudents, s => s.new)],
+                ['Підготовча група', countBy(activeStudents, s => s.group?.title === 'Підготовча')],
+                ['Молодша група', countBy(activeStudents, s => s.group?.title === 'Молодша')],
+                ['Середня група', countBy(activeStudents, s => s.group?.title === 'Середня')],
+                ['Старша група', countBy(activeStudents, s => s.group?.title === 'Старша')],
+                ['Дівчат', countBy(activeStudents, s => s.sex?.title === 'дівчина')],
+                ['Хлопців', countBy(activeStudents, s => s.sex?.title === 'хлопець')],
+                ['Соціально незахищених', countBy(activeStudents, s => s.socially_vulnerable)],
+                ['З ООП', countBy(activeStudents, s => s.oop)],
+                ['У Архіві', rawStudentsData.filter(s => s.arhive).length],
+            ];
+            tbody.innerHTML = stats.map(([k, v]) =>
+                `<tr><td><strong>${k}</strong></td><td>${v}</td></tr>`
+            ).join('');
+        }
+
+        function filterTable() {
+            const query = document.getElementById('search-input').value.toLowerCase();
+            const rows = document.querySelectorAll('#table-body tr');
+            rows.forEach(row => {
+                row.style.display = row.innerText.toLowerCase().includes(query) ? '' : 'none';
+            });
+        }
+
+        function toggleDrawer(open) {
+            document.getElementById('right-drawer').classList.toggle('open', open);
+            document.getElementById('drawer-overlay').classList.toggle('active', open);
+        }
+
+        function openAddStudentModal() {
+            if (!currentClubId) {
+                alert('Спочатку створіть або оберіть клуб');
+                return;
+            }
+            editingStudentId = null;
+            document.getElementById('student-modal-title').innerHTML = '<i class="fa-solid fa-user-plus"></i> Додати учня';
+            document.getElementById('student-modal-submit-btn').innerText = 'Додати учня';
+            document.getElementById('student-form').reset();
+            populateStudentFormSelects();
+            document.getElementById('sf-new').checked = true;
+            document.getElementById('sf-oop').checked = true;
+            document.getElementById('sf-socially_vulnerable').checked = false;
+            setRowColorInForm('none');
+            document.getElementById('student-modal').classList.add('active');
+        }
+
+        function openEditStudentModal(id) {
+            const s = rawStudentsData.find(x => x.id === id);
+            if (!s) return;
+            editingStudentId = id;
+            document.getElementById('student-modal-title').innerHTML = '<i class="fa-solid fa-pen"></i> Редагувати учня';
+            document.getElementById('student-modal-submit-btn').innerText = 'Зберегти зміни';
+            populateStudentFormSelects();
+            document.getElementById('sf-name').value = s.name || '';
+            document.getElementById('sf-new').checked = !!s.new;
+            document.getElementById('sf-bithday').value = s.bithday || '';
+            document.getElementById('sf-school_id').value = s.school_id || '';
+            document.getElementById('sf-sex_id').value = s.sex_id || '';
+            document.getElementById('sf-group_id').value = s.group_id || '';
+            document.getElementById('sf-mother').value = s.mother && s.mother !== '—' ? s.mother : '';
+            document.getElementById('sf-mother_telephone').value = s.mother_telephone && s.mother_telephone !== '—' ? s.mother_telephone : '';
+            document.getElementById('sf-father').value = s.father && s.father !== '—' ? s.father : '';
+            document.getElementById('sf-father_telephone').value = s.father_telephone && s.father_telephone !== '—' ? s.father_telephone : '';
+            document.getElementById('sf-address').value = s.address && s.address !== '—' ? s.address : '';
+            document.getElementById('sf-category').value = s.category && s.category !== '—' ? s.category : '';
+            document.getElementById('sf-socially_vulnerable').checked = !!s.socially_vulnerable;
+            document.getElementById('sf-oop').checked = !!s.oop;
+            setRowColorInForm(s.row_color || 'none');
+            document.getElementById('student-modal').classList.add('active');
+        }
+
+        function closeStudentModal() {
+            document.getElementById('student-modal').classList.remove('active');
+            editingStudentId = null;
+        }
+
+        function collectStudentFormData() {
+            const val = id => document.getElementById(id).value;
+            const checked = id => document.getElementById(id).checked;
+            const clean = v => (v && String(v).trim() !== '') ? v.trim() : '—';
+            const colorVal = val('sf-row_color');
+            const row_color = ROW_COLORS.includes(colorVal) ? colorVal : null;
+            return {
+                name: val('sf-name').trim(),
+                new: checked('sf-new'),
+                bithday: val('sf-bithday') || null,
+                school_id: parseInt(val('sf-school_id')) || null,
+                sex_id: parseInt(val('sf-sex_id')) || null,
+                group_id: parseInt(val('sf-group_id')) || null,
+                mother: clean(val('sf-mother')),
+                mother_telephone: clean(val('sf-mother_telephone')),
+                father: clean(val('sf-father')),
+                father_telephone: clean(val('sf-father_telephone')),
+                address: clean(val('sf-address')),
+                category: clean(val('sf-category')),
+                socially_vulnerable: checked('sf-socially_vulnerable'),
+                oop: checked('sf-oop'),
+                row_color: row_color,
+            };
+        }
+
+        async function submitStudentForm() {
+            const form = document.getElementById('student-form');
+            if (!form.reportValidity()) return;
+
+            const payload = collectStudentFormData();
+            if (!payload.school_id || !payload.sex_id || !payload.group_id) {
+                alert('Будь ласка, оберіть: навчальний заклад, стать, групу');
+                return;
+            }
+
+            try {
+                if (editingStudentId) {
+                    const { error } = await supabaseClient
+                        .from('students')
+                        .update(payload)
+                        .eq('id', editingStudentId);
+                    if (error) {
+                        if (String(error.message || '').includes('row_color')) {
+                            console.warn('row_color колонки ще немає, зберігаємо без кольору...');
+                            const safe = { ...payload };
+                            delete safe.row_color;
+                            const r = await supabaseClient.from('students').update(safe).eq('id', editingStudentId);
+                            if (r.error) throw r.error;
+                        } else {
+                            throw error;
+                        }
+                    }
+                    alert('Дані учня оновлено!');
+                } else {
+                    const insertPayload = { ...payload, arhive: false };
+                    let { data: inserted, error } = await supabaseClient
+                        .from('students')
+                        .insert([insertPayload])
+                        .select();
+                    if (error && String(error.message || '').includes('row_color')) {
+                        console.warn('row_color колонки ще немає, вставляємо без кольору...');
+                        const safe = { ...insertPayload };
+                        delete safe.row_color;
+                        const r = await supabaseClient.from('students').insert([safe]).select();
+                        inserted = r.data;
+                        error = r.error;
+                    }
+                    if (error) throw error;
+                    if (!inserted || inserted.length === 0) throw new Error('Не вдалося створити запис');
+
+                    const linkRes = await supabaseClient
+                        .from('students_club')
+                        .insert([{ student_id: inserted[0].id, club_id: currentClubId }]);
+                    if (linkRes.error) throw linkRes.error;
+                    alert('Учня додано!');
+                }
+                closeStudentModal();
+                fetchStudents();
+            } catch (err) {
+                alert('Помилка: ' + err.message);
+            }
+        }
+
+        function openArchiveModal(id, name) {
+            studentToArchiveId = id;
+            document.getElementById('archive-student-name').innerText = name;
+            document.getElementById('archive-modal').classList.add('active');
+        }
+        function closeArchiveModal() {
+            studentToArchiveId = null;
+            document.getElementById('archive-modal').classList.remove('active');
+        }
+        document.getElementById('confirm-archive-btn').addEventListener('click', async () => {
+            if (studentToArchiveId) {
+                const { error } = await supabaseClient
+                    .from('students')
+                    .update({ arhive: true })
+                    .eq('id', studentToArchiveId);
+                if (error) {
+                    alert('Помилка: ' + error.message);
+                } else {
+                    closeArchiveModal();
+                    fetchStudents();
+                }
+            }
+        });
+
+        function openDeleteModal(id, name) {
+            studentToDeleteId = id;
+            document.getElementById('delete-student-name').innerText = name;
+            document.getElementById('delete-modal').classList.add('active');
+        }
+        function closeDeleteModal() {
+            studentToDeleteId = null;
+            document.getElementById('delete-modal').classList.remove('active');
+        }
+        document.getElementById('confirm-delete-btn').addEventListener('click', async () => {
+            if (studentToDeleteId) {
+                await supabaseClient.from('students_club').delete().eq('student_id', studentToDeleteId);
+                const { error } = await supabaseClient.from('students').delete().eq('id', studentToDeleteId);
+                if (error) {
+                    alert('Помилка при видаленні з БД: ' + error.message);
+                } else {
+                    closeDeleteModal();
+                    fetchStudents();
+                }
+            }
+        });
+
+        async function logout() {
+            await customLogout();
+            window.location.href = 'index.html';
+        }
+
+        async function initPage() {
+            currentUser = await checkAuthAndRedirect();
+            if (!currentUser) return;
+
+            await loadDictionaries();
+            const clubs = await loadUserClubs();
+            renderClubSelect(clubs);
+
+            document.querySelectorAll('#sf-row-color-picker .color-dot').forEach(dot => {
+                dot.addEventListener('click', () => setRowColorInForm(dot.dataset.color));
+            });
+
+            document.getElementById('create-club-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const title = document.getElementById('new-club-title').value.trim();
+                if (!title) return;
+                try {
+                    const { data: newClubs, error: createError } = await supabaseClient
+                        .from('club')
+                        .insert([{ title }])
+                        .select();
+                    if (createError) throw createError;
+                    if (!newClubs || newClubs.length === 0) throw new Error('Клуб не створено');
+                    const newClub = newClubs[0];
+                    const { error: linkError } = await supabaseClient
+                        .from('user_club')
+                        .insert([{ user_id: currentUser.id, club_id: newClub.id }]);
+                    if (linkError) throw linkError;
+                    document.getElementById('new-club-title').value = '';
+                    currentClubId = newClub.id;
+                    const updatedClubs = await loadUserClubs();
+                    renderClubSelect(updatedClubs);
+                    alert('Клуб успішно створено!');
+                } catch (err) {
+                    alert('Помилка створення клубу: ' + err.message);
+                }
+            });
+        }
+
+        initPage();
+    </script>
+</body>
+</html>

@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <title>Особистий кабінет</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+</head>
+<body>
+
+    <header class="app-header">
+        <h1>Особистий кабінет</h1>
+        <a href="club.html" class="btn btn-secondary"><i class="fa-solid fa-arrow-left"></i> Назад до клубу</a>
+    </header>
+
+    <div class="profile-container">
+        <div class="card">
+            <h3>Обліковий запис</h3>
+            <p><strong>User ID:</strong> <span id="user-id">-</span></p><br>
+
+            <form id="profile-form">
+                <div class="form-group">
+                    <label>Логін</label>
+                    <input type="text" id="profile-login" required>
+                </div>
+                <div class="form-group">
+                    <label>Новий пароль</label>
+                    <input type="password" id="profile-password" placeholder="Залиште порожнім, якщо не змінюєте">
+                </div>
+                <div class="form-group">
+                    <label>Підтвердження пароля</label>
+                    <input type="password" id="profile-password-confirm" placeholder="Залиште порожнім, якщо не змінюєте">
+                </div>
+                <button type="submit" class="btn btn-primary">Зберегти зміни</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <h3>Підключені клуби</h3>
+            <ul id="clubs-list" class="styled-list"></ul>
+
+            <hr><br>
+            <h4>Створити та підключити новий клуб</h4><br>
+            <form id="add-club-form" style="display: flex; gap: 10px;">
+                <input type="text" id="new-club-title" placeholder="Назва клубу" required style="flex:1; padding: 8px;">
+                <button type="submit" class="btn btn-success">Додати</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let currentUser = null;
+
+        async function initProfile() {
+            currentUser = await checkAuthAndRedirect();
+            if (!currentUser) return;
+
+            document.getElementById('user-id').innerText = currentUser.id;
+            document.getElementById('profile-login').value = currentUser.login;
+
+            loadUserClubs();
+        }
+
+        async function loadUserClubs() {
+            const { data: userLinks, error: linksError } = await supabaseClient
+                .from('user_club')
+                .select('club_id')
+                .eq('user_id', currentUser.id);
+
+            if (linksError) {
+                console.error('Помилка завантаження зв\'язків:', linksError);
+                return;
+            }
+
+            const ul = document.getElementById('clubs-list');
+
+            if (!userLinks || userLinks.length === 0) {
+                ul.innerHTML = '<li>Немає підключених клубів</li>';
+                return;
+            }
+
+            const clubIds = userLinks.map(l => l.club_id);
+            const { data: clubs, error: clubsError } = await supabaseClient
+                .from('club')
+                .select('*')
+                .in('id', clubIds);
+
+            if (clubsError) {
+                console.error('Помилка завантаження клубів:', clubsError);
+                return;
+            }
+
+            if (clubs && clubs.length > 0) {
+                ul.innerHTML = clubs.map(c => `<li><i class="fa-solid fa-users-viewfinder"></i> <strong>${c.title}</strong> (ID: ${c.id})</li>`).join('');
+            } else {
+                ul.innerHTML = '<li>Немає підключених клубів</li>';
+            }
+        }
+
+        document.getElementById('profile-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const newLogin = document.getElementById('profile-login').value.trim();
+            const newPassword = document.getElementById('profile-password').value;
+            const passwordConfirm = document.getElementById('profile-password-confirm').value;
+
+            if (!newLogin) {
+                alert('Логін не може бути порожнім');
+                return;
+            }
+
+            if (newPassword !== passwordConfirm) {
+                alert('Паролі не співпадають');
+                return;
+            }
+
+            if (newPassword && newPassword.length < 6) {
+                alert('Пароль повинен бути щонайменше 6 символів');
+                return;
+            }
+
+            const { data: existing, error: checkError } = await supabaseClient
+                .from('users')
+                .select('id')
+                .eq('login', newLogin)
+                .neq('id', currentUser.id)
+                .limit(1);
+
+            if (checkError) {
+                alert('Помилка перевірки: ' + checkError.message);
+                return;
+            }
+            if (existing && existing.length > 0) {
+                alert('Користувач з таким логіном вже існує');
+                return;
+            }
+
+            const updateData = { login: newLogin };
+            if (newPassword.trim() !== '') {
+                updateData.password = newPassword;
+            }
+
+            const { error } = await supabaseClient
+                .from('users')
+                .update(updateData)
+                .eq('id', currentUser.id);
+
+            if (error) {
+                alert('Помилка оновлення: ' + error.message);
+            } else {
+                setCurrentUser({ id: currentUser.id, login: newLogin });
+                currentUser = { id: currentUser.id, login: newLogin };
+                alert('Дані успішно оновлено!');
+            }
+        });
+
+        document.getElementById('add-club-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const title = document.getElementById('new-club-title').value.trim();
+            if (!title) return;
+
+            try {
+                const { data: newClub, error: createError } = await supabaseClient
+                    .from('club')
+                    .insert([{ title }])
+                    .select();
+
+                if (createError) throw createError;
+                if (!newClub || newClub.length === 0) throw new Error('Клуб не створено');
+
+                const { error: linkError } = await supabaseClient
+                    .from('user_club')
+                    .insert([{ user_id: currentUser.id, club_id: newClub[0].id }]);
+
+                if (linkError) throw linkError;
+
+                document.getElementById('new-club-title').value = '';
+                loadUserClubs();
+                alert('Клуб успішно створено!');
+            } catch (err) {
+                alert('Помилка створення клубу: ' + err.message);
+            }
+        });
+
+        initProfile();
+    </script>
+</body>
+</html>
