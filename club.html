@@ -2,16 +2,24 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>Панель управління клубом</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StepSync Manager</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase-config.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body>
 
     <header class="app-header">
-        <h1 id="current-club-title">Завантаження клубу...</h1>
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+            <h1 style="margin: 0; font-size: 20px;">StepSync Manager</h1>
+            <span style="opacity: 0.5;">|</span>
+            <h2 id="current-club-title" style="margin: 0; font-size: 16px; font-weight: normal;">Завантаження...</h2>
+        </div>
         <button class="btn-icon" onclick="toggleDrawer(true)"><i class="fa-solid fa-bars"></i></button>
     </header>
 
@@ -33,25 +41,65 @@
         </aside>
 
         <main class="content-area">
-            <div class="toolbar">
-                <input type="text" id="search-input" placeholder="Пошук за ПІБ..." oninput="filterTable()">
+            <!-- Дії та кнопки -->
+            <div class="toolbar" style="margin-bottom: 10px;">
                 <button class="btn btn-success" id="add-student-btn" onclick="openAddStudentModal()">
                     <i class="fa-solid fa-user-plus"></i> Додати учня
                 </button>
-                <button class="btn btn-secondary" onclick="window.print()"><i class="fa-solid fa-print"></i> Друк / Зберегти PDF</button>
+                <button class="btn btn-secondary" onclick="printDocument()"><i class="fa-solid fa-print"></i> Друк / Зберегти PDF</button>
+                <button class="btn btn-success" onclick="exportToExcel()"><i class="fa-solid fa-file-excel"></i> Експортувати в Excel</button>
+            </div>
+
+            <!-- Панель Фільтрації та Пошуку -->
+            <div class="filter-panel" id="filter-controls-panel">
+                <div class="filter-grid">
+                    <div class="filter-item">
+                        <label><i class="fa-solid fa-magnifying-glass"></i> Пошук:</label>
+                        <input type="text" id="search-input" placeholder="ПІБ, телефон, адреса..." oninput="applyFiltersAndSort()">
+                    </div>
+                    <div class="filter-item" id="filter-group-box">
+                        <label><i class="fa-solid fa-layer-group"></i> Група:</label>
+                        <select id="filter-group" onchange="applyFiltersAndSort()">
+                            <option value="">Всі групи</option>
+                        </select>
+                    </div>
+                    <div class="filter-item">
+                        <label><i class="fa-solid fa-venus-mars"></i> Стать:</label>
+                        <select id="filter-sex" onchange="applyFiltersAndSort()">
+                            <option value="">Усі</option>
+                        </select>
+                    </div>
+                    <div class="filter-item">
+                        <label><i class="fa-solid fa-school"></i> Заклад:</label>
+                        <select id="filter-school" onchange="applyFiltersAndSort()">
+                            <option value="">Усі заклади</option>
+                        </select>
+                    </div>
+                    <div class="filter-item">
+                        <label><i class="fa-solid fa-filter"></i> Категорія / Статус:</label>
+                        <select id="filter-status" onchange="applyFiltersAndSort()">
+                            <option value="">Усі учні</option>
+                            <option value="new">Новоприбулі (н/п)</option>
+                            <option value="social">Соціально незахищені</option>
+                            <option value="oop">ООП</option>
+                        </select>
+                    </div>
+                    <div class="filter-item" style="justify-content: flex-end;">
+                        <button class="btn btn-secondary" onclick="resetFilters()" style="padding: 6px 12px; font-size: 13px;">
+                            <i class="fa-solid fa-rotate-left"></i> Скинути
+                        </button>
+                    </div>
+                </div>
             </div>
 
             <div class="table-container" id="printable-area">
                 <h2 id="tab-heading">Загальний список учнів</h2>
-                <table class="data-table">
-                    <thead>
-                        <tr id="table-header-row"></tr>
-                    </thead>
-                    <tbody id="table-body"></tbody>
-                </table>
+                <div id="dynamic-content"></div>
             </div>
         </main>
     </div>
+
+    <div id="print-container"></div>
 
     <div class="drawer-overlay" id="drawer-overlay" onclick="toggleDrawer(false)"></div>
     <aside class="right-drawer" id="right-drawer">
@@ -64,14 +112,31 @@
                 <label>Поточний клуб:</label>
                 <select id="club-select" onchange="changeClub(this.value)"></select>
             </div>
-            <hr><br>
+            
+            <div class="form-group" style="margin-top: 10px;">
+                <label>Змінити назву клубу:</label>
+                <div style="display: flex; gap: 6px;">
+                    <input type="text" id="edit-club-title" placeholder="Нова назва клубу" style="padding: 6px; flex: 1;">
+                    <button class="btn btn-primary" onclick="updateClubTitle()"><i class="fa-solid fa-check"></i></button>
+                </div>
+            </div>
+
+            <hr style="margin: 15px 0;">
+            <h4 style="margin-bottom: 8px;">Документальні назви груп (Рівні)</h4>
+            <div style="display: flex; flex-direction: column; gap: 6px; font-size: 13px;">
+                <div><label>Підготовча:</label><input type="text" id="doc-name-prep" style="width:100%; padding:4px;" onchange="saveDocNames()"></div>
+                <div><label>Молодша:</label><input type="text" id="doc-name-junior" style="width:100%; padding:4px;" onchange="saveDocNames()"></div>
+                <div><label>Середня:</label><input type="text" id="doc-name-middle" style="width:100%; padding:4px;" onchange="saveDocNames()"></div>
+                <div><label>Старша:</label><input type="text" id="doc-name-senior" style="width:100%; padding:4px;" onchange="saveDocNames()"></div>
+            </div>
+
+            <hr style="margin: 15px 0;">
             <h4 style="margin-bottom: 8px;">Створити новий клуб</h4>
             <form id="create-club-form" style="display: flex; flex-direction: column; gap: 8px;">
                 <input type="text" id="new-club-title" placeholder="Назва клубу" required style="padding: 8px; width: 100%; box-sizing: border-box;">
                 <button type="submit" class="btn btn-success w-full"><i class="fa-solid fa-plus"></i> Додати клуб</button>
             </form>
-            <br>
-            <hr><br>
+            <br><hr><br>
             <a href="profile.html" class="btn btn-primary w-full"><i class="fa-solid fa-user"></i> Особистий кабінет</a>
             <br><br>
             <button class="btn btn-danger w-full" onclick="logout()"><i class="fa-solid fa-right-from-bracket"></i> Вийти</button>
@@ -149,7 +214,7 @@
                 <div class="student-form-grid" style="grid-template-columns: 1fr 1fr; margin-top: 6px;">
                     <div class="form-group">
                         <label class="field-label">Категорія</label>
-                        <input type="text" id="sf-category" placeholder="напр. ВПО, дитинбудинок...">
+                        <input type="text" id="sf-category" placeholder="напр. ВПО, багатодітна сім'я...">
                     </div>
                     <div class="form-group">
                         <label class="field-label">Колір рядка</label>
@@ -175,7 +240,7 @@
                             </label>
                             <label class="toggle">
                                 <span>ООП</span>
-                                <input type="checkbox" id="sf-oop" checked>
+                                <input type="checkbox" id="sf-oop">
                                 <span class="toggle-slider"></span>
                             </label>
                         </div>
@@ -213,26 +278,260 @@
     </div>
 
     <style>
-        .btn-icon-inline {
-            padding: 4px 8px;
-            font-size: 13px;
-            margin-right: 4px;
+        .btn-icon-inline { padding: 4px 8px; font-size: 13px; margin-right: 4px; }
+        .action-btns { white-space: nowrap; }
+
+        .filter-panel {
+            background: #f8f9fa;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 12px 15px;
+            margin-bottom: 15px;
         }
-        .action-btns {
+        .filter-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 10px;
+            align-items: flex-end;
+        }
+        .filter-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .filter-item label {
+            font-size: 12px;
+            font-weight: bold;
+            color: #555;
+        }
+        .filter-item input, .filter-item select {
+            padding: 6px 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+
+        th.sortable {
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+            padding-right: 18px !important;
+        }
+        th.sortable:hover {
+            background-color: #e9ecef;
+        }
+        th.sortable::after {
+            content: '↕';
+            position: absolute;
+            right: 4px;
+            opacity: 0.4;
+            font-size: 11px;
+        }
+        th.sort-asc::after { content: '▲'; opacity: 1; }
+        th.sort-desc::after { content: '▼'; opacity: 1; }
+
+        .group-summary-footer {
+            display: flex;
+            margin-top: 15px;
+            border: 1px solid #333;
+            width: fit-content;
+            font-weight: bold;
+            text-align: center;
+            align-items: center;
+        }
+        .group-summary-footer div {
+            padding: 8px 15px;
+            border-right: 1px solid #333;
+        }
+        .group-summary-footer div:last-child { border-right: none; }
+
+        .vertical-th {
+            writing-mode: vertical-rl;
+            transform: rotate(180deg);
             white-space: nowrap;
+            padding: 10px 4px !important;
+            font-weight: normal;
+            font-size: 11px;
+            height: 120px;
+            text-align: left;
+            vertical-align: bottom;
+        }
+
+        .stats-block-title {
+            font-size: 16px;
+            font-weight: bold;
+            text-align: center;
+            margin: 15px 0 5px 0;
+        }
+
+        #print-container { display: none; }
+        
+        /* ПОВНЕ ПРИХОВУВАННЯ ВЕРХНІХ ТА НИЖНІХ КОЛОНТИТУЛІВ БРАУЗЕРА ПРИ ДРУКУ */
+        @page {
+            size: A4 portrait;
+            margin: 0; /* Прибирає назву сайту, дату та номер сторінки */
+        }
+        
+        @media print {
+            body * { visibility: hidden; }
+            #print-container, #print-container * { visibility: visible; }
+            #print-container {
+                display: block !important;
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                background: white;
+                color: black;
+                font-family: 'Times New Roman', serif;
+                font-size: 9.5pt;
+            }
+            .print-page { 
+                page-break-after: always; 
+                padding: 15mm 15mm 15mm 15mm; /* Чистий внутрішній відступ від країв паперу */
+                box-sizing: border-box;
+            }
+            .print-table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+            .print-table th, .print-table td { border: 1px solid #000; padding: 5px 6px; font-size: 9pt; text-align: center; }
+            .print-table th { background-color: #f2f2f2 !important; -webkit-print-color-adjust: exact; }
+            .left { text-align: left !important; }
+            .stats-hdr { font-weight: bold; font-size: 12pt; text-align: center; margin-bottom: 15px; }
+            .v-th { writing-mode: vertical-rl; transform: rotate(180deg); height: 110px; white-space: nowrap; text-align: left; }
+            .print-summary-box {
+                display: flex;
+                border: 1px solid #000;
+                width: fit-content;
+                font-weight: bold;
+                margin-top: 10px;
+                font-size: 9.5pt;
+            }
+            .print-summary-box div {
+                padding: 6px 12px;
+                border-right: 1px solid #000;
+            }
+            .print-summary-box div:last-child { border-right: none; }
         }
     </style>
 
     <script>
         let currentUser = null;
         let currentClubId = null;
+        let currentClub = null;
         let currentTab = 'all';
         let rawStudentsData = [];
         let dictionaries = { school: [], sex: [], group: [] };
         let editingStudentId = null;
         let studentToDeleteId = null;
         let studentToArchiveId = null;
+
+        // Стан сортування по колонках
+        let sortColumn = 'index';
+        let sortDirection = 'asc';
+
         const ROW_COLORS = ['none', 'red', 'blue', 'yellow', 'green', 'purple'];
+
+        let docGroupNames = {
+            'Підготовча': localStorage.getItem('doc_prep') || 'Підготовчий, 1 рік',
+            'Молодша': localStorage.getItem('doc_junior') || 'Основний, 2 рік',
+            'Середня': localStorage.getItem('doc_middle') || 'Основний, 3 рік',
+            'Старша': localStorage.getItem('doc_senior') || 'Вищий, 3 рік'
+        };
+
+        const SCHOOL_COLUMNS_CONFIG = [
+            { title: 'Школа № 1', match: ['школа № 1', 'школа №1', 'школа 1'] },
+            { title: 'Школа № 2', match: ['школа № 2', 'школа №2', 'школа 2'] },
+            { title: 'Школа № 3', match: ['школа № 3', 'школа №3', 'школа 3'] },
+            { title: 'Школа № 4', match: ['школа № 4', 'школа №4', 'школа 4'] },
+            { title: 'Школа № 5', match: ['школа № 5', 'школа №5', 'школа 5'] },
+            { title: 'Школа № 6', match: ['школа № 6', 'школа №6', 'школа 6'] },
+            { title: 'Школа № 7', match: ['школа № 7', 'школа №7', 'школа 7'] },
+            { title: 'Школа № 8', match: ['школа № 8', 'школа №8', 'школа 8'] },
+            { title: 'Школа № 9', match: ['школа № 9', 'школа №9', 'школа 9'] },
+            { title: 'Міський ліцей', match: ['міський ліцей', 'ПМЛ'] },
+            { title: 'Школа № 11', match: ['школа № 11', 'школа №11', 'школа 11'] },
+            { title: 'Школа № 12', match: ['школа № 12', 'школа №12', 'школа 12'] },
+            { title: 'Школа № 14', match: ['школа № 14', 'школа №14', 'школа 14'] },
+            { title: 'Школа № 15', match: ['школа № 15', 'школа №15', 'школа 15'] },
+            { title: 'Школа № 17', match: ['школа № 17', 'школа №17', 'школа 17'] },
+            { title: 'Школа № 18', match: ['школа № 18', 'школа №18', 'школа 18'] },
+            { title: 'Школа № 19', match: ['школа № 19', 'школа №19', 'школа 19'] },
+            { title: 'Школа № 20', match: ['школа № 20', 'школа №20', 'школа 20'] },
+            { title: 'Д/с', match: ['д/с', 'д/садок', 'садок', 'дошкільний'] },
+            { title: 'Інший заклад освіти', match: ['інший заклад освіти', 'інше', 'інший'] },
+            { title: 'Не відвідує закладів', match: ['не відвідує закладів', 'не відвідує', '—', ''] }
+        ];
+
+        function getSchoolCount(activeStudents, schoolConfig) {
+            if (schoolConfig.title === 'Не відвідує закладів') {
+                return activeStudents.filter(s => s.school_id === 1 || !s.school || !s.school.title).length;
+            }
+            return activeStudents.filter(s => {
+                const schoolTitle = (s.school?.title || '').trim().toLowerCase();
+                return schoolConfig.match.some(m => schoolTitle === m || schoolTitle.includes(m));
+            }).length;
+        }
+
+        function calculateAge(birthdayStr) {
+            if (!birthdayStr) return null;
+            const birth = new Date(birthdayStr);
+            if (isNaN(birth.getTime())) return null;
+            const today = new Date();
+            let age = today.getFullYear() - birth.getFullYear();
+            const m = today.getMonth() - birth.getMonth();
+            if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+            return age;
+        }
+
+        function sortByAge(studentsList) {
+            return [...studentsList].sort((a, b) => {
+                const timeA = a.bithday ? new Date(a.bithday).getTime() : 0;
+                const timeB = b.bithday ? new Date(b.bithday).getTime() : 0;
+                return timeB - timeA;
+            });
+        }
+
+        function formatDate(iso) {
+            if (!iso) return '';
+            const d = new Date(iso);
+            if (isNaN(d)) return iso || '';
+            const dd = String(d.getDate()).padStart(2, '0');
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            return `${dd}.${mm}.${d.getFullYear()}`;
+        }
+
+        function orDash(val) {
+            return (val && String(val).trim() !== '') ? val : '—';
+        }
+
+        function loadDocNamesIntoInputs() {
+            document.getElementById('doc-name-prep').value = docGroupNames['Підготовча'];
+            document.getElementById('doc-name-junior').value = docGroupNames['Молодша'];
+            document.getElementById('doc-name-middle').value = docGroupNames['Середня'];
+            document.getElementById('doc-name-senior').value = docGroupNames['Старша'];
+        }
+
+        function saveDocNames() {
+            docGroupNames['Підготовча'] = document.getElementById('doc-name-prep').value.trim();
+            docGroupNames['Молодша'] = document.getElementById('doc-name-junior').value.trim();
+            docGroupNames['Середня'] = document.getElementById('doc-name-middle').value.trim();
+            docGroupNames['Старша'] = document.getElementById('doc-name-senior').value.trim();
+
+            localStorage.setItem('doc_prep', docGroupNames['Підготовча']);
+            localStorage.setItem('doc_junior', docGroupNames['Молодша']);
+            localStorage.setItem('doc_middle', docGroupNames['Середня']);
+            localStorage.setItem('doc_senior', docGroupNames['Старша']);
+
+            renderTable();
+        }
+
+        function updateDocNameInline(groupTitle, newName) {
+            docGroupNames[groupTitle] = newName.trim();
+            if (groupTitle === 'Підготовча') localStorage.setItem('doc_prep', newName.trim());
+            if (groupTitle === 'Молодша') localStorage.setItem('doc_junior', newName.trim());
+            if (groupTitle === 'Середня') localStorage.setItem('doc_middle', newName.trim());
+            if (groupTitle === 'Старша') localStorage.setItem('doc_senior', newName.trim());
+            loadDocNamesIntoInputs();
+        }
 
         function setRowColorInForm(color) {
             const c = (color && ROW_COLORS.includes(color)) ? color : 'none';
@@ -246,38 +545,13 @@
         async function saveStudentRowColor(studentId, color) {
             const c = (color && ROW_COLORS.includes(color)) ? color : 'none';
             try {
-                const { error } = await supabaseClient
-                    .from('students')
-                    .update({ row_color: c })
-                    .eq('id', studentId);
-                if (error) {
-                    console.warn('Не вдалося зберегти колір row_color — можливо, колонки ще немає в БД.', error.message);
-                }
+                await supabaseClient.from('students').update({ row_color: c }).eq('id', studentId);
                 const s = rawStudentsData.find(x => x.id === studentId);
                 if (s) s.row_color = c;
-                const tr = document.querySelector(`tr[data-student-id="${studentId}"]`);
-                if (tr) {
-                    ROW_COLORS.forEach(k => { if (k !== 'none') tr.classList.remove('row-' + k); });
-                    if (c !== 'none') tr.classList.add('row-' + c);
-                }
+                renderTable();
             } catch (e) {
-                console.warn('Помилка зміни кольору:', e.message || e);
+                console.warn('Помилка зміни кольору:', e);
             }
-        }
-
-        function calculateAge(birthdayStr) {
-            if (!birthdayStr) return '';
-            const birth = new Date(birthdayStr);
-            if (isNaN(birth.getTime())) return '';
-            const today = new Date();
-            let age = today.getFullYear() - birth.getFullYear();
-            const m = today.getMonth() - birth.getMonth();
-            if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
-            return age;
-        }
-
-        function orDash(val) {
-            return (val && String(val).trim() !== '') ? val : '—';
         }
 
         async function loadDictionaries() {
@@ -286,51 +560,31 @@
                 supabaseClient.from('sex').select('*').order('id'),
                 supabaseClient.from('group').select('*').order('id')
             ]);
-
-            if (s.error) console.warn('school load error:', s.error.message || s.error);
-            if (sx.error) console.warn('sex load error:', sx.error.message || sx.error);
-            if (g.error) console.warn('group load error:', g.error.message || g.error);
-
             dictionaries.school = s.data || [];
             dictionaries.sex = sx.data || [];
             dictionaries.group = g.data || [];
 
-            if (dictionaries.sex.length === 0) {
-                const seedSex = [{ id: 1, title: 'дівчина' }, { id: 2, title: 'хлопець' }];
-                const res = await supabaseClient.from('sex').insert(seedSex).select();
-                if (!res.error && res.data) dictionaries.sex = res.data;
-                else dictionaries.sex = seedSex;
-            }
-            if (dictionaries.group.length === 0) {
-                const seedGroup = [
-                    { id: 1, title: 'Підготовча' },
-                    { id: 2, title: 'Молодша' },
-                    { id: 3, title: 'Середня' },
-                    { id: 4, title: 'Старша' }
-                ];
-                const res = await supabaseClient.from('group').insert(seedGroup).select();
-                if (!res.error && res.data) dictionaries.group = res.data;
-                else dictionaries.group = seedGroup;
-            }
-            if (dictionaries.school.length === 0) {
-                const seedSchool = [
-                    { id: 1, title: 'Школа №1' },
-                    { id: 2, title: 'Школа №9' },
-                    { id: 3, title: 'Школа №12' },
-                    { id: 4, title: 'д/с "Сонечко"' },
-                    { id: 5, title: 'д/с "Ромашка"' }
-                ];
-                const res = await supabaseClient.from('school').insert(seedSchool).select();
-                if (!res.error && res.data) dictionaries.school = res.data;
-                else dictionaries.school = seedSchool;
-            }
+            populateFilterDropdowns();
+        }
+
+        function populateFilterDropdowns() {
+            const fillSelect = (id, list, defaultText) => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                el.innerHTML = `<option value="">${defaultText}</option>` +
+                    list.map(i => `<option value="${i.id}">${i.title}</option>`).join('');
+            };
+
+            fillSelect('filter-group', dictionaries.group, 'Всі групи');
+            fillSelect('filter-sex', dictionaries.sex, 'Усі');
+            fillSelect('filter-school', dictionaries.school, 'Усі заклади');
         }
 
         function populateStudentFormSelects() {
-            const fill = (id, list, key = 'id', label = 'title') => {
+            const fill = (id, list) => {
                 const el = document.getElementById(id);
                 el.innerHTML = '<option value="">-- оберіть --</option>' +
-                    list.map(i => `<option value="${i[key]}">${i[label]}</option>`).join('');
+                    list.map(i => `<option value="${i.id}">${i.title}</option>`).join('');
             };
             fill('sf-school_id', dictionaries.school);
             fill('sf-sex_id', dictionaries.sex);
@@ -338,27 +592,10 @@
         }
 
         async function loadUserClubs() {
-            const { data: userLinks, error: linksError } = await supabaseClient
-                .from('user_club')
-                .select('club_id')
-                .eq('user_id', currentUser.id);
-
-            if (linksError) {
-                console.error('Помилка завантаження зв\'язків користувач-клуб:', linksError);
-                return [];
-            }
+            const { data: userLinks } = await supabaseClient.from('user_club').select('club_id').eq('user_id', currentUser.id);
             if (!userLinks || userLinks.length === 0) return [];
-
             const clubIds = userLinks.map(l => l.club_id);
-            const { data: clubs, error: clubsError } = await supabaseClient
-                .from('club')
-                .select('*')
-                .in('id', clubIds);
-
-            if (clubsError) {
-                console.error('Помилка завантаження клубів:', clubsError);
-                return [];
-            }
+            const { data: clubs } = await supabaseClient.from('club').select('*').in('id', clubIds);
             return clubs || [];
         }
 
@@ -371,9 +608,10 @@
                     `<option value="${c.id}" ${c.id === currentClubId ? 'selected' : ''}>${c.title}</option>`
                 ).join('');
                 if (!currentClubId) currentClubId = clubs[0].id;
-                const currentClub = clubs.find(c => c.id === currentClubId) || clubs[0];
+                currentClub = clubs.find(c => c.id === currentClubId) || clubs[0];
                 currentClubId = currentClub.id;
                 document.getElementById('current-club-title').innerText = currentClub.title;
+                document.getElementById('edit-club-title').value = currentClub.title;
                 fetchStudents();
             } else {
                 clubSelect.innerHTML = '';
@@ -384,33 +622,43 @@
             }
         }
 
-        async function fetchStudents() {
-            if (!currentClubId) {
-                rawStudentsData = [];
-                renderTable();
-                return;
+        function changeClub(val) {
+            currentClubId = parseInt(val);
+            const clubs = Array.from(document.getElementById('club-select').options);
+            const sel = clubs.find(o => parseInt(o.value) === currentClubId);
+            if (sel) {
+                document.getElementById('current-club-title').innerText = sel.text;
+                document.getElementById('edit-club-title').value = sel.text;
             }
-            const { data: clubLinks } = await supabaseClient
-                .from('students_club')
-                .select('student_id')
-                .eq('club_id', currentClubId);
+            fetchStudents();
+        }
 
-            if (!clubLinks || clubLinks.length === 0) {
-                rawStudentsData = [];
-                renderTable();
-                return;
+        async function updateClubTitle() {
+            const newTitle = document.getElementById('edit-club-title').value.trim();
+            if (!newTitle || !currentClubId) return;
+
+            try {
+                const { error } = await supabaseClient.from('club').update({ title: newTitle }).eq('id', currentClubId);
+                if (error) throw error;
+                document.getElementById('current-club-title').innerText = newTitle;
+                const clubs = await loadUserClubs();
+                renderClubSelect(clubs);
+            } catch (err) {
+                alert('Помилка оновлення назви: ' + err.message);
             }
+        }
+
+        async function fetchStudents() {
+            if (!currentClubId) { rawStudentsData = []; renderTable(); return; }
+            const { data: clubLinks } = await supabaseClient.from('students_club').select('student_id').eq('club_id', currentClubId);
+            if (!clubLinks || clubLinks.length === 0) { rawStudentsData = []; renderTable(); return; }
 
             const studentIds = clubLinks.map(l => l.student_id);
-            const { data: students, error } = await supabaseClient
-                .from('students')
+            const { data: students, error } = await supabaseClient.from('students')
                 .select('*, school(title), sex(title), group(title)')
                 .in('id', studentIds);
 
-            if (error) {
-                console.error("Помилка завантаження:", error);
-                return;
-            }
+            if (error) { console.error("Помилка завантаження:", error); return; }
             rawStudentsData = students || [];
             renderTable();
         }
@@ -419,135 +667,318 @@
             currentTab = tab;
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             if (btn) btn.classList.add('active');
+
+            const filterPanel = document.getElementById('filter-controls-panel');
+            const groupFilterBox = document.getElementById('filter-group-box');
+
+            if (currentTab === 'stats') {
+                filterPanel.style.display = 'none';
+            } else {
+                filterPanel.style.display = 'block';
+            }
+
+            if (['prep', 'junior', 'middle', 'senior'].includes(currentTab)) {
+                groupFilterBox.style.display = 'none';
+            } else {
+                groupFilterBox.style.display = 'flex';
+            }
+
             renderTable();
         }
 
-        function renderTable() {
-            const header = document.getElementById('table-header-row');
-            const tbody = document.getElementById('table-body');
-            const heading = document.getElementById('tab-heading');
+        function setSortColumn(col) {
+            if (sortColumn === col) {
+                sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                sortColumn = col;
+                sortDirection = 'asc';
+            }
+            renderTable();
+        }
 
-            let filtered = rawStudentsData;
+        function resetFilters() {
+            document.getElementById('search-input').value = '';
+            document.getElementById('filter-group').value = '';
+            document.getElementById('filter-sex').value = '';
+            document.getElementById('filter-school').value = '';
+            document.getElementById('filter-status').value = '';
+            sortColumn = 'index';
+            sortDirection = 'asc';
+            renderTable();
+        }
+
+        function applyFiltersAndSort() {
+            renderTable();
+        }
+
+        function getFilteredAndSortedStudents() {
+            let list = [...rawStudentsData];
 
             if (currentTab === 'archive') {
-                filtered = filtered.filter(s => s.arhive === true);
-                heading.innerText = "Архівний список";
-            } else if (currentTab === 'stats') {
-                heading.innerText = "Статистичні дані";
+                list = list.filter(s => s.arhive === true);
             } else {
-                filtered = filtered.filter(s => s.arhive !== true);
-                if (currentTab === 'prep') filtered = filtered.filter(s => s.group?.title === 'Підготовча');
-                else if (currentTab === 'junior') filtered = filtered.filter(s => s.group?.title === 'Молодша');
-                else if (currentTab === 'middle') filtered = filtered.filter(s => s.group?.title === 'Середня');
-                else if (currentTab === 'senior') filtered = filtered.filter(s => s.group?.title === 'Старша');
-                else if (currentTab === 'social') filtered = filtered.filter(s => s.socially_vulnerable === true);
-                else if (currentTab === 'oop') filtered = filtered.filter(s => s.oop === true);
-                heading.innerText = "Список учнів";
+                list = list.filter(s => s.arhive !== true);
+                if (currentTab === 'prep') list = list.filter(s => s.group?.title === 'Підготовча');
+                else if (currentTab === 'junior') list = list.filter(s => s.group?.title === 'Молодша');
+                else if (currentTab === 'middle') list = list.filter(s => s.group?.title === 'Середня');
+                else if (currentTab === 'senior') list = list.filter(s => s.group?.title === 'Старша');
+                else if (currentTab === 'social') list = list.filter(s => s.socially_vulnerable === true);
+                else if (currentTab === 'oop') list = list.filter(s => s.oop === true);
             }
 
+            const search = (document.getElementById('search-input')?.value || '').toLowerCase().trim();
+            const groupFilter = document.getElementById('filter-group')?.value;
+            const sexFilter = document.getElementById('filter-sex')?.value;
+            const schoolFilter = document.getElementById('filter-school')?.value;
+            const statusFilter = document.getElementById('filter-status')?.value;
+
+            if (search) {
+                list = list.filter(s => {
+                    const line = [s.name, s.mother, s.mother_telephone, s.father, s.father_telephone, s.address, s.category].join(' ').toLowerCase();
+                    return line.includes(search);
+                });
+            }
+
+            if (groupFilter) list = list.filter(s => String(s.group_id) === String(groupFilter));
+            if (sexFilter) list = list.filter(s => String(s.sex_id) === String(sexFilter));
+            if (schoolFilter) list = list.filter(s => String(s.school_id) === String(schoolFilter));
+
+            if (statusFilter === 'new') list = list.filter(s => s.new === true);
+            if (statusFilter === 'social') list = list.filter(s => s.socially_vulnerable === true);
+            if (statusFilter === 'oop') list = list.filter(s => s.oop === true);
+
+            list.sort((a, b) => {
+                let valA, valB;
+                if (sortColumn === 'name') { valA = a.name || ''; valB = b.name || ''; }
+                else if (sortColumn === 'age') { valA = a.bithday ? new Date(a.bithday).getTime() : 0; valB = b.bithday ? new Date(b.bithday).getTime() : 0; }
+                else if (sortColumn === 'school') { valA = a.school?.title || ''; valB = b.school?.title || ''; }
+                else if (sortColumn === 'group') { valA = a.group?.title || ''; valB = b.group?.title || ''; }
+                else { valA = a.id; valB = b.id; }
+
+                if (typeof valA === 'string') {
+                    return sortDirection === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+                }
+                return sortDirection === 'asc' ? valA - valB : valB - valA;
+            });
+
+            return list;
+        }
+
+        function renderTable() {
+            const container = document.getElementById('dynamic-content');
+            const heading = document.getElementById('tab-heading');
+
+            if (currentTab === 'archive') heading.innerText = "Архівний список";
+            else if (currentTab === 'stats') heading.innerText = "Статистичні дані";
+            else heading.innerText = "Список учнів";
+
             if (currentTab === 'stats') {
-                renderStatsView(header, tbody, filtered, rawStudentsData.filter(s => s.arhive !== true));
-                filterTable();
+                renderFullStatsView(container, rawStudentsData.filter(s => s.arhive !== true));
                 return;
             }
 
-            const isArchive = currentTab === 'archive';
+            const filtered = getFilteredAndSortedStudents();
+            const isGroupTab = ['prep', 'junior', 'middle', 'senior'].includes(currentTab);
 
-            header.innerHTML = `
-                <th>ID</th>
-                <th>ПІБ</th>
-                <th>Новоприбулі</th>
-                <th>Вік (років)</th>
-                <th>Дата народження</th>
-                <th>Навчальний заклад</th>
-                <th>Стать</th>
-                <th>Група</th>
-                <th>Мати</th>
-                <th>Батько</th>
-                <th>Домашня адреса</th>
-                <th>Категорія</th>
-                <th>Дії</th>
-            `;
+            let currentGroupTitle = '';
+            if (currentTab === 'prep') currentGroupTitle = 'Підготовча';
+            if (currentTab === 'junior') currentGroupTitle = 'Молодша';
+            if (currentTab === 'middle') currentGroupTitle = 'Середня';
+            if (currentTab === 'senior') currentGroupTitle = 'Старша';
 
-            tbody.innerHTML = filtered.map((s, idx) => {
-                const motherLine = [s.mother, s.mother_telephone].filter(x => x && x.trim()).join(' ');
-                const fatherLine = [s.father, s.father_telephone].filter(x => x && x.trim()).join(' ');
-                const rowColor = (s.row_color && ROW_COLORS.includes(s.row_color) && s.row_color !== 'none')
-                    ? 'row-' + s.row_color : '';
-                const dotColors = ['none', 'red', 'blue', 'yellow', 'green', 'purple'];
-                const quickColorDots = dotColors.map(c => {
-                    const tt = c === 'none' ? 'Без кольору' :
-                        (c === 'red' ? 'Червоний' :
-                         c === 'blue' ? 'Синій' :
-                         c === 'yellow' ? 'Жовтий' :
-                         c === 'green' ? 'Зелений' : 'Фіолетовий');
-                    return `<span class="color-dot ${c}" title="${tt}" onclick="saveStudentRowColor(${s.id}, '${c}')"></span>`;
+            const getThClass = col => col === sortColumn ? `sortable sort-${sortDirection}` : 'sortable';
+
+            let tableHtml = `
+                <table class="data-table" id="main-students-table">
+                    <thead>
+                        <tr>
+                            <th class="${getThClass('index')}" onclick="setSortColumn('index')">№</th>
+                            <th class="${getThClass('name')}" onclick="setSortColumn('name')">ПІБ</th>
+                            <th>Новоприбулі</th>
+                            <th class="${getThClass('age')}" onclick="setSortColumn('age')">Вік</th>
+                            <th class="${getThClass('school')}" onclick="setSortColumn('school')">Навчальний заклад</th>
+                            <th>Стать</th>
+                            ${!isGroupTab ? `<th class="${getThClass('group')}" onclick="setSortColumn('group')">Група</th>` : ''}
+                            <th>Мати</th>
+                            <th>Батько</th>
+                            <th>Домашня адреса</th>
+                            <th>Категорія</th>
+                            <th>Дії</th>
+                        </tr>
+                    </thead>
+                    <tbody id="table-body">`;
+
+            if (filtered.length === 0) {
+                tableHtml += `<tr><td colspan="12" style="text-align:center; padding: 20px; color: #777;">За вашим запитом учнів не знайдено</td></tr>`;
+            } else {
+                tableHtml += filtered.map((s, idx) => {
+                    const motherLine = [s.mother, s.mother_telephone].filter(x => x && x.trim()).join(' ');
+                    const fatherLine = [s.father, s.father_telephone].filter(x => x && x.trim()).join(' ');
+                    const rowColor = (s.row_color && ROW_COLORS.includes(s.row_color) && s.row_color !== 'none') ? 'row-' + s.row_color : '';
+                    const quickColorDots = ROW_COLORS.map(c => `<span class="color-dot ${c}" title="${c}" onclick="saveStudentRowColor(${s.id}, '${c}')"></span>`).join('');
+                    
+                    return `
+                    <tr data-student-id="${s.id}" class="${rowColor}">
+                        <td>${idx + 1}</td>
+                        <td><strong>${s.name}</strong></td>
+                        <td>${s.new ? 'н/п' : ''}</td>
+                        <td>${calculateAge(s.bithday) || ''}</td>
+                        <td>${orDash(s.school?.title)}</td>
+                        <td>${orDash(s.sex?.title)}</td>
+                        ${!isGroupTab ? `<td>${orDash(s.group?.title)}</td>` : ''}
+                        <td>${orDash(motherLine)}</td>
+                        <td>${orDash(fatherLine)}</td>
+                        <td>${orDash(s.address)}</td>
+                        <td>${orDash(s.category)}</td>
+                        <td class="action-btns">
+                            <div class="color-dots">${quickColorDots}</div>
+                            <div style="margin-top: 4px;">
+                                ${currentTab === 'archive' ? `
+                                    <button class="btn btn-danger btn-icon-inline" onclick="openDeleteModal(${s.id}, '${s.name.replace(/'/g, "\\'")}')"><i class="fa-solid fa-trash"></i></button>
+                                ` : `
+                                    <button class="btn btn-primary btn-icon-inline" onclick="openEditStudentModal(${s.id})"><i class="fa-solid fa-pen"></i></button>
+                                    <button class="btn btn-warning btn-icon-inline" onclick="openArchiveModal(${s.id}, '${s.name.replace(/'/g, "\\'")}')"><i class="fa-solid fa-box-archive"></i></button>
+                                `}
+                            </div>
+                        </td>
+                    </tr>`;
                 }).join('');
-                return `
-                <tr data-student-id="${s.id}" class="${rowColor}">
-                    <td>${s.id}</td>
-                    <td><strong>${s.name}</strong></td>
-                    <td>${s.new ? 'н/п' : ''}</td>
-                    <td>${calculateAge(s.bithday)}</td>
-                    <td>${s.bithday || ''}</td>
-                    <td>${orDash(s.school?.title)}</td>
-                    <td>${orDash(s.sex?.title)}</td>
-                    <td>${orDash(s.group?.title)}</td>
-                    <td>${orDash(motherLine)}</td>
-                    <td>${orDash(fatherLine)}</td>
-                    <td>${orDash(s.address)}</td>
-                    <td>${orDash(s.category)}</td>
-                    <td class="action-btns">
-                        <div class="color-dots" title="Колір рядка">${quickColorDots}</div>
-                        <div style="margin-top: 4px;">
-                            ${isArchive ? `
-                                <button class="btn btn-danger btn-icon-inline" onclick="openDeleteModal(${s.id}, '${s.name.replace(/'/g, "\\'")}')">
-                                    <i class="fa-solid fa-trash"></i> Видалити
-                                </button>
-                            ` : `
-                                <button class="btn btn-primary btn-icon-inline" onclick="openEditStudentModal(${s.id})">
-                                    <i class="fa-solid fa-pen"></i> Редагувати
-                                </button>
-                                <button class="btn btn-warning btn-icon-inline" onclick="openArchiveModal(${s.id}, '${s.name.replace(/'/g, "\\'")}')">
-                                    <i class="fa-solid fa-box-archive"></i> Архів
-                                </button>
-                            `}
-                        </div>
-                    </td>
-                </tr>`;
-            }).join('');
+            }
 
-            filterTable();
+            tableHtml += `</tbody></table>`;
+
+            if (isGroupTab) {
+                const docName = docGroupNames[currentGroupTitle] || currentGroupTitle;
+                tableHtml += `
+                    <div class="group-summary-footer">
+                        <div><input type="text" value="${docName}" onchange="updateDocNameInline('${currentGroupTitle}', this.value)" style="padding: 4px; border: 1px solid #ccc; border-radius: 4px; font-weight: bold; width: 190px; text-align: center;" title="Змінити документальну назву"></div>
+                        <div>${currentGroupTitle}</div>
+                        <div>${filtered.length} дітей</div>
+                    </div>`;
+            }
+
+            container.innerHTML = tableHtml;
         }
 
-        function renderStatsView(header, tbody, currentFiltered, activeStudents) {
-            header.innerHTML = '<th>Показник</th><th>Значення</th>';
-            const total = activeStudents.length;
-            const countBy = (list, predicate) => list.filter(predicate).length;
-            const stats = [
-                ['Всього активних учнів', total],
-                ['Новоприбулих (н/п)', countBy(activeStudents, s => s.new)],
-                ['Підготовча група', countBy(activeStudents, s => s.group?.title === 'Підготовча')],
-                ['Молодша група', countBy(activeStudents, s => s.group?.title === 'Молодша')],
-                ['Середня група', countBy(activeStudents, s => s.group?.title === 'Середня')],
-                ['Старша група', countBy(activeStudents, s => s.group?.title === 'Старша')],
-                ['Дівчат', countBy(activeStudents, s => s.sex?.title === 'дівчина')],
-                ['Хлопців', countBy(activeStudents, s => s.sex?.title === 'хлопець')],
-                ['Соціально незахищених', countBy(activeStudents, s => s.socially_vulnerable)],
-                ['З ООП', countBy(activeStudents, s => s.oop)],
-                ['У Архіві', rawStudentsData.filter(s => s.arhive).length],
-            ];
-            tbody.innerHTML = stats.map(([k, v]) =>
-                `<tr><td><strong>${k}</strong></td><td>${v}</td></tr>`
-            ).join('');
-        }
+        function renderFullStatsView(container, activeStudents) {
+            const order = ['Підготовча', 'Молодша', 'Середня', 'Старша'];
+            const groupsList = [...dictionaries.group].sort((a, b) => order.indexOf(a.title) - order.indexOf(b.title));
 
-        function filterTable() {
-            const query = document.getElementById('search-input').value.toLowerCase();
-            const rows = document.querySelectorAll('#table-body tr');
-            rows.forEach(row => {
-                row.style.display = row.innerText.toLowerCase().includes(query) ? '' : 'none';
+            let html = `
+                <div style="max-width: 950px; margin: 0 auto;">
+                <div class="stats-block-title">StepSync Manager — СТАТИСТИЧНІ ДАНІ<br>${currentClub?.title || ''}</div>
+                <table class="data-table" style="margin-bottom: 25px;">
+                    <thead>
+                        <tr><th>Рівень навчання</th><th>Назва групи</th><th>Кількість дітей в групі</th></tr>
+                    </thead>
+                    <tbody>`;
+            
+            groupsList.forEach(g => {
+                const count = activeStudents.filter(s => s.group_id === g.id).length;
+                const docName = docGroupNames[g.title] || g.title;
+                html += `<tr><td>${docName}</td><td>${g.title}</td><td>${count}</td></tr>`;
             });
+            html += `<tr style="font-weight:bold; background:#f9f9f9;"><td colspan="2">Всього дітей в гуртку:</td><td>${activeStudents.length}</td></tr>`;
+            html += `</tbody></table>`;
+
+            html += `<table class="data-table" style="margin-bottom: 25px;">
+                <thead>
+                    <tr>
+                        <th style="vertical-align: middle; text-align: left; padding-left: 10px;">Навчальний заклад<br>(ліцеї, гімназії, ЗДО)</th>
+                        ${SCHOOL_COLUMNS_CONFIG.map(sc => `<th class="vertical-th"><div>${sc.title}</div></th>`).join('')}
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="text-align: left; font-weight: bold; padding-left: 10px;">Кількість дітей</td>
+                        ${SCHOOL_COLUMNS_CONFIG.map(sc => `<td>${getSchoolCount(activeStudents, sc)}</td>`).join('')}
+                    </tr>
+                    <tr style="font-weight:bold; background:#f9f9f9;">
+                        <td style="text-align: left; padding-left: 10px;">Всього: ${activeStudents.length}</td>
+                        <td colspan="${SCHOOL_COLUMNS_CONFIG.length}"></td>
+                    </tr>
+                </tbody>
+            </table>`;
+
+            const ageHeaders = ['<= 6', '7 років', '8 років', '9 років', '10 років', '11 років', '12 років', '13 років', '14 років', '15 років', '16 років', '17 років', '18>='];
+            const girls = activeStudents.filter(s => s.sex?.title === 'дівчина');
+            const boys = activeStudents.filter(s => s.sex?.title === 'хлопець');
+
+            const countByAge = (list, min, max) => list.filter(c => {
+                const a = calculateAge(c.bithday);
+                return a !== null && a >= min && a <= max;
+            }).length;
+
+            let girlsCells = '', boysCells = '', totalCells = '';
+            let gTot = 0, bTot = 0;
+
+            ageHeaders.forEach(h => {
+                let min = 0, max = 0;
+                if (h === '<= 6') { min = 0; max = 6; }
+                else if (h === '18>=') { min = 18; max = 100; }
+                else { min = parseInt(h); max = parseInt(h); }
+
+                const g = countByAge(girls, min, max);
+                const b = countByAge(boys, min, max);
+                gTot += g; bTot += b;
+
+                girlsCells += `<td>${g}</td>`;
+                boysCells += `<td>${b}</td>`;
+                totalCells += `<td>${g + b}</td>`;
+            });
+
+            html += `<table class="data-table" style="margin-bottom: 25px;">
+                <thead>
+                    <tr>
+                        <th></th>
+                        ${ageHeaders.map(h => `<th>${h}</th>`).join('')}
+                        <th>Всього</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td><strong>З них дівчат</strong></td>${girlsCells}<td><strong>${gTot}</strong></td></tr>
+                    <tr><td><strong>З них хлопців</strong></td>${boysCells}<td><strong>${bTot}</strong></td></tr>
+                    <tr style="font-weight:bold;"><td>Разом</td>${totalCells}<td>${gTot + bTot}</td></tr>
+                </tbody>
+            </table>`;
+
+            const basePreschoolYear = new Date().getFullYear() - 7;
+            const pYears = [basePreschoolYear, basePreschoolYear + 1, basePreschoolYear + 2, basePreschoolYear + 3];
+
+            const getByBirthYear = yr => activeStudents.filter(s => s.bithday && new Date(s.bithday).getFullYear() === yr).length;
+            const d1 = getByBirthYear(pYears[0]);
+            const d2 = getByBirthYear(pYears[1]);
+            const d3 = getByBirthYear(pYears[2]);
+            const d4 = getByBirthYear(pYears[3]);
+            const sumPreschoolYears = d1 + d2 + d3 + d4;
+
+            const countExactAge = targetAge => activeStudents.filter(s => calculateAge(s.bithday) === targetAge).length;
+            const p6 = countExactAge(6);
+            const p5 = countExactAge(5);
+            const p4 = countExactAge(4);
+            const totalPreschoolAge = activeStudents.filter(s => {
+                const a = calculateAge(s.bithday);
+                return a !== null && a <= 6;
+            }).length;
+
+            html += `<table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Діти ${pYears[0]}р.н</th><th>Діти ${pYears[1]}р.н</th><th>Діти ${pYears[2]}р.н</th><th>Діти ${pYears[3]}р.н</th>
+                        <th>Всього в т/о</th><th>Повних 6р.</th><th>Повних 5р.</th><th>Повних 4р.</th>
+                        <th>Всього дітей дошкільного віку</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>${d1}</td><td>${d2}</td><td>${d3}</td><td>${d4}</td>
+                        <td><strong>${sumPreschoolYears}</strong></td><td>${p6}</td><td>${p5}</td><td>${p4}</td>
+                        <td><strong>${totalPreschoolAge}</strong></td>
+                    </tr>
+                </tbody>
+            </table></div>`;
+
+            container.innerHTML = html;
         }
 
         function toggleDrawer(open) {
@@ -556,17 +987,14 @@
         }
 
         function openAddStudentModal() {
-            if (!currentClubId) {
-                alert('Спочатку створіть або оберіть клуб');
-                return;
-            }
+            if (!currentClubId) { alert('Спочатку створіть або оберіть клуб'); return; }
             editingStudentId = null;
             document.getElementById('student-modal-title').innerHTML = '<i class="fa-solid fa-user-plus"></i> Додати учня';
             document.getElementById('student-modal-submit-btn').innerText = 'Додати учня';
             document.getElementById('student-form').reset();
             populateStudentFormSelects();
             document.getElementById('sf-new').checked = true;
-            document.getElementById('sf-oop').checked = true;
+            document.getElementById('sf-oop').checked = false;
             document.getElementById('sf-socially_vulnerable').checked = false;
             setRowColorInForm('none');
             document.getElementById('student-modal').classList.add('active');
@@ -639,49 +1067,19 @@
 
             try {
                 if (editingStudentId) {
-                    const { error } = await supabaseClient
-                        .from('students')
-                        .update(payload)
-                        .eq('id', editingStudentId);
-                    if (error) {
-                        if (String(error.message || '').includes('row_color')) {
-                            console.warn('row_color колонки ще немає, зберігаємо без кольору...');
-                            const safe = { ...payload };
-                            delete safe.row_color;
-                            const r = await supabaseClient.from('students').update(safe).eq('id', editingStudentId);
-                            if (r.error) throw r.error;
-                        } else {
-                            throw error;
-                        }
-                    }
-                    alert('Дані учня оновлено!');
+                    const { error } = await supabaseClient.from('students').update(payload).eq('id', editingStudentId);
+                    if (error) throw error;
                 } else {
                     const insertPayload = { ...payload, arhive: false };
-                    let { data: inserted, error } = await supabaseClient
-                        .from('students')
-                        .insert([insertPayload])
-                        .select();
-                    if (error && String(error.message || '').includes('row_color')) {
-                        console.warn('row_color колонки ще немає, вставляємо без кольору...');
-                        const safe = { ...insertPayload };
-                        delete safe.row_color;
-                        const r = await supabaseClient.from('students').insert([safe]).select();
-                        inserted = r.data;
-                        error = r.error;
-                    }
+                    let { data: inserted, error } = await supabaseClient.from('students').insert([insertPayload]).select();
                     if (error) throw error;
-                    if (!inserted || inserted.length === 0) throw new Error('Не вдалося створити запис');
-
-                    const linkRes = await supabaseClient
-                        .from('students_club')
-                        .insert([{ student_id: inserted[0].id, club_id: currentClubId }]);
+                    const linkRes = await supabaseClient.from('students_club').insert([{ student_id: inserted[0].id, club_id: currentClubId }]);
                     if (linkRes.error) throw linkRes.error;
-                    alert('Учня додано!');
                 }
                 closeStudentModal();
                 fetchStudents();
             } catch (err) {
-                alert('Помилка: ' + err.message);
+                alert('Помилка збереження: ' + err.message);
             }
         }
 
@@ -696,16 +1094,9 @@
         }
         document.getElementById('confirm-archive-btn').addEventListener('click', async () => {
             if (studentToArchiveId) {
-                const { error } = await supabaseClient
-                    .from('students')
-                    .update({ arhive: true })
-                    .eq('id', studentToArchiveId);
-                if (error) {
-                    alert('Помилка: ' + error.message);
-                } else {
-                    closeArchiveModal();
-                    fetchStudents();
-                }
+                const { error } = await supabaseClient.from('students').update({ arhive: true }).eq('id', studentToArchiveId);
+                if (error) alert('Помилка: ' + error.message);
+                else { closeArchiveModal(); fetchStudents(); }
             }
         });
 
@@ -722,17 +1113,356 @@
             if (studentToDeleteId) {
                 await supabaseClient.from('students_club').delete().eq('student_id', studentToDeleteId);
                 const { error } = await supabaseClient.from('students').delete().eq('id', studentToDeleteId);
-                if (error) {
-                    alert('Помилка при видаленні з БД: ' + error.message);
-                } else {
-                    closeDeleteModal();
-                    fetchStudents();
-                }
+                if (error) alert('Помилка при видаленні з БД: ' + error.message);
+                else { closeDeleteModal(); fetchStudents(); }
             }
         });
 
+        function renderPrintStudentTable(studentsList, titleText, groupTitle = '', docName = '') {
+            if (!studentsList || studentsList.length === 0) return '';
+            const sortedList = sortByAge(studentsList);
+
+            return `
+            <div class="print-page">
+                <div class="stats-hdr">${titleText}</div>
+                <table class="print-table">
+                    <thead>
+                        <tr>
+                            <th>№</th><th>ПІБ</th><th>Новоприбулі</th><th>Вік</th>
+                            <th>Навчальний заклад</th><th>Стать</th><th>Група</th>
+                            <th>Мати</th><th>Батько</th><th>Домашня адреса</th><th>Категорія</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${sortedList.map((c, i) => `<tr>
+                            <td>${i + 1}</td>
+                            <td class="left">${c.name || ''}</td>
+                            <td>${c.new ? 'н/п' : ''}</td>
+                            <td>${calculateAge(c.bithday) || ''}</td>
+                            <td>${c.school?.title || ''}</td>
+                            <td>${c.sex?.title || ''}</td>
+                            <td>${c.group?.title || ''}</td>
+                            <td class="left">${[c.mother, c.mother_telephone].filter(x => x && x !== '—').join(' ')}</td>
+                            <td class="left">${[c.father, c.father_telephone].filter(x => x && x !== '—').join(' ')}</td>
+                            <td class="left">${c.address || ''}</td>
+                            <td>${c.category || ''}</td>
+                        </tr>`).join('')}
+                    </tbody>
+                </table>
+                ${groupTitle ? `
+                <div class="print-summary-box">
+                    <div>${docName}</div>
+                    <div>${groupTitle}</div>
+                    <div>${sortedList.length} дітей</div>
+                </div>` : ''}
+            </div>`;
+        }
+
+        function printDocument() {
+            const active = rawStudentsData.filter(s => s.arhive !== true);
+            const archive = rawStudentsData.filter(s => s.arhive === true);
+            const social = active.filter(s => s.socially_vulnerable === true);
+            const oop = active.filter(s => s.oop === true);
+
+            if (!rawStudentsData.length) { alert('Немає даних для друку'); return; }
+
+            const order = ['Підготовча', 'Молодша', 'Середня', 'Старша'];
+            const groupsList = [...dictionaries.group].sort((a, b) => order.indexOf(a.title) - order.indexOf(b.title));
+
+            let html = '';
+            html += renderPrintStudentTable(active, 'Загальний список учнів гуртка');
+
+            groupsList.forEach(g => {
+                const list = active.filter(c => c.group_id === g.id);
+                const docName = docGroupNames[g.title] || g.title;
+                if (list.length) {
+                    html += renderPrintStudentTable(list, `Група: ${g.title}`, g.title, docName);
+                }
+            });
+
+            const ageHeaders = ['<= 6', '7 років', '8 років', '9 років', '10 років', '11 років', '12 років', '13 років', '14 років', '15 років', '16 років', '17 років', '18>='];
+            const girls = active.filter(c => c.sex?.title === 'дівчина');
+            const boys = active.filter(c => c.sex?.title === 'хлопець');
+
+            const countByAge = (list, min, max) => list.filter(c => {
+                const a = calculateAge(c.bithday);
+                return a !== null && a >= min && a <= max;
+            }).length;
+
+            let girlsRow = '', boysRow = '', totalRow = '';
+            let gTot = 0, bTot = 0;
+
+            ageHeaders.forEach(h => {
+                let min = 0, max = 0;
+                if (h === '<= 6') { min = 0; max = 6; }
+                else if (h === '18>=') { min = 18; max = 100; }
+                else { min = parseInt(h); max = parseInt(h); }
+
+                const g = countByAge(girls, min, max);
+                const b = countByAge(boys, min, max);
+                gTot += g; bTot += b;
+
+                girlsRow += `<td>${g}</td>`;
+                boysRow += `<td>${b}</td>`;
+                totalRow += `<td>${g + b}</td>`;
+            });
+
+            const basePreschoolYear = new Date().getFullYear() - 7;
+            const pYears = [basePreschoolYear, basePreschoolYear + 1, basePreschoolYear + 2, basePreschoolYear + 3];
+
+            const getByBirthYear = yr => active.filter(s => s.bithday && new Date(s.bithday).getFullYear() === yr).length;
+            const d1 = getByBirthYear(pYears[0]);
+            const d2 = getByBirthYear(pYears[1]);
+            const d3 = getByBirthYear(pYears[2]);
+            const d4 = getByBirthYear(pYears[3]);
+            const sumPreschoolYears = d1 + d2 + d3 + d4;
+
+            const countExactAge = targetAge => active.filter(s => calculateAge(s.bithday) === targetAge).length;
+            const p6 = countExactAge(6);
+            const p5 = countExactAge(5);
+            const p4 = countExactAge(4);
+            const totalPreschoolAge = active.filter(s => {
+                const a = calculateAge(s.bithday);
+                return a !== null && a <= 6;
+            }).length;
+
+            html += `<div class="print-page">
+                <div class="stats-hdr">StepSync Manager — СТАТИСТИЧНІ ДАНІ<br>${currentClub?.title || ''}</div>
+                <table class="print-table">
+                    <thead><tr><th>Рівень навчання</th><th>Назва групи</th><th>Кількість дітей в групі</th></tr></thead>
+                    <tbody>
+                        ${groupsList.map(g => `<tr>
+                            <td>${docGroupNames[g.title] || g.title}</td>
+                            <td>${g.title}</td>
+                            <td>${active.filter(c => c.group_id === g.id).length}</td>
+                        </tr>`).join('')}
+                        <tr style="font-weight:bold;">
+                            <td colspan="2">Всього дітей в гуртку:</td>
+                            <td>${active.length}</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <table class="print-table">
+                    <thead>
+                        <tr>
+                            <th>Навчальний заклад (ліцеї, гімназії, ЗДО)</th>
+                            ${SCHOOL_COLUMNS_CONFIG.map(sc => `<th class="v-th"><div>${sc.title}</div></th>`).join('')}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Кількість дітей</strong></td>
+                            ${SCHOOL_COLUMNS_CONFIG.map(sc => `<td>${getSchoolCount(active, sc)}</td>`).join('')}
+                        </tr>
+                        <tr style="font-weight:bold;">
+                            <td>Всього: ${active.length}</td>
+                            <td colspan="${SCHOOL_COLUMNS_CONFIG.length}"></td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <table class="print-table">
+                    <thead><tr><th></th>${ageHeaders.map(h => `<th>${h}</th>`).join('')}<th>Всього</th></tr></thead>
+                    <tbody>
+                        <tr><td><strong>З них дівчат</strong></td>${girlsRow}<td><strong>${gTot}</strong></td></tr>
+                        <tr><td><strong>З них хлопців</strong></td>${boysRow}<td><strong>${bTot}</strong></td></tr>
+                        <tr style="font-weight:bold;"><td>Разом</td>${totalRow}<td>${gTot + bTot}</td></tr>
+                    </tbody>
+                </table>
+
+                <table class="print-table">
+                    <thead>
+                        <tr>
+                            <th>Діти ${pYears[0]}р.н</th><th>Діти ${pYears[1]}р.н</th><th>Діти ${pYears[2]}р.н</th><th>Діти ${pYears[3]}р.н</th>
+                            <th>Всього в т/о</th><th>Повних 6р.</th><th>Повних 5р.</th><th>Повних 4р.</th>
+                            <th>Всього дітей дошкільного віку</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>${d1}</td><td>${d2}</td><td>${d3}</td><td>${d4}</td>
+                            <td><strong>${sumPreschoolYears}</strong></td><td>${p6}</td><td>${p5}</td><td>${p4}</td>
+                            <td><strong>${totalPreschoolAge}</strong></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>`;
+
+            html += renderPrintStudentTable(social, 'Соціально незахищені категорії');
+            html += renderPrintStudentTable(oop, 'Особи з особливими освітніми потребами (ООП)');
+            html += renderPrintStudentTable(archive, 'Архівний список');
+
+            document.getElementById('print-container').innerHTML = html;
+            window.print();
+        }
+
+        // ===================== Інтегрована функція Експорту в Excel =====================
+        function exportToExcel() {
+            if (typeof XLSX === 'undefined') { alert('Бібліотеку XLSX не завантажено. Перевірте інтернет-з\'єднання.'); return; }
+            if (!rawStudentsData || !rawStudentsData.length) { alert('Немає даних для експорту'); return; }
+
+            const wb = XLSX.utils.book_new();
+            const children = rawStudentsData.filter(s => s.arhive !== true);
+
+            const sortByName = (list) => [...list].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+            const sortByBirthDesc = (list) => sortByAge(list);
+            const sortBySchool = (list) => [...list].sort((a, b) => (a.school?.title || '').localeCompare(b.school?.title || ''));
+
+            const isNewLabel = (c) => c.new ? 'н/п' : '';
+            const calcAge = (bday) => calculateAge(bday) || '';
+            const genderUk = (c) => c.sex?.title || '';
+            const getGroupName = (groupId) => {
+                const g = dictionaries.group.find(x => x.id === groupId);
+                return g ? g.title : '';
+            };
+            const formatParents = (c) => {
+                const m = [c.mother, c.mother_telephone].filter(x => x && x !== '—').join(' ');
+                const f = [c.father, c.father_telephone].filter(x => x && x !== '—').join(' ');
+                return [m ? `Мати: ${m}` : '', f ? `Батько: ${f}` : ''].filter(Boolean).join('; ');
+            };
+
+            const generalCols = [{ wch: 5 }, { wch: 32 }, { wch: 11 }, { wch: 10 }, { wch: 18 }, { wch: 10 }, { wch: 12 }, { wch: 15 }, { wch: 34 }, { wch: 34 }, { wch: 28 }, { wch: 30 }];
+
+            // ---------- Аркуш: Загальний ----------
+            const generalRows = sortByName(children).map((c, i) => ({
+                '№': i + 1,
+                'ПІБ': c.name || '',
+                'Новоприбулі': isNewLabel(c),
+                'Вік (років)': calcAge(c.bithday),
+                'Навчальний заклад': c.school?.title || '',
+                'Стать': genderUk(c),
+                'Група': getGroupName(c.group_id),
+                'Дата народження': formatDate(c.bithday),
+                'Мати': [c.mother, c.mother_telephone].filter(x => x && x !== '—').join(' '),
+                'Батько': [c.father, c.father_telephone].filter(x => x && x !== '—').join(' '),
+                'Домашня адреса': c.address || '',
+                'Категорія': c.category || ''
+            }));
+            const wsGeneral = XLSX.utils.json_to_sheet(generalRows);
+            wsGeneral['!cols'] = generalCols;
+            XLSX.utils.book_append_sheet(wb, wsGeneral, 'Загальний');
+
+            // ---------- Аркуші груп ----------
+            const order = ['Підготовча', 'Молодша', 'Середня', 'Старша'];
+            const groupsList = [...dictionaries.group].sort((a, b) => order.indexOf(a.title) - order.indexOf(b.title));
+
+            groupsList.forEach(g => {
+                const list = sortByBirthDesc(children.filter(c => c.group_id === g.id));
+                const rows = list.map((c, i) => ({
+                    'Індекс': i + 1,
+                    'ПІБ': c.name || '',
+                    'Новоприбулі': isNewLabel(c),
+                    'Вік (років)': calcAge(c.bithday),
+                    'Навчальний заклад': c.school?.title || '',
+                    'Стать': genderUk(c),
+                    'Мати': [c.mother, c.mother_telephone].filter(x => x && x !== '—').join(' '),
+                    'Батько': [c.father, c.father_telephone].filter(x => x && x !== '—').join(' '),
+                    'Домашня адреса': c.address || '',
+                    'Категорія': c.category || ''
+                }));
+                const level = docGroupNames[g.title] || g.title;
+                rows.push({
+                    'Індекс': level,
+                    'ПІБ': g.title,
+                    'Вік (років)': list.length,
+                    'Домашня адреса': 'дітей'
+                });
+                const ws = XLSX.utils.json_to_sheet(rows);
+                ws['!cols'] = [{ wch: 18 }, { wch: 32 }, { wch: 11 }, { wch: 10 }, { wch: 18 }, { wch: 10 }, { wch: 34 }, { wch: 34 }, { wch: 28 }, { wch: 30 }];
+                XLSX.utils.book_append_sheet(wb, ws, g.title);
+            });
+
+            // ---------- Аркуш: С вік ----------
+            const byAgeRows = sortByBirthDesc(children).map((c, i) => ({
+                '№': i + 1,
+                'ПІБ': c.name || '',
+                'Новоприбулі': isNewLabel(c),
+                'Вік (років)': calcAge(c.bithday),
+                'Навчальний заклад': c.school?.title || '',
+                'Стать': genderUk(c),
+                'Група': getGroupName(c.group_id),
+                'Дата народження': formatDate(c.bithday),
+                'Мати': [c.mother, c.mother_telephone].filter(x => x && x !== '—').join(' '),
+                'Батько': [c.father, c.father_telephone].filter(x => x && x !== '—').join(' '),
+                'Домашня адреса': c.address || '',
+                'Категорія': c.category || ''
+            }));
+            const wsByAge = XLSX.utils.json_to_sheet(byAgeRows);
+            wsByAge['!cols'] = generalCols;
+            XLSX.utils.book_append_sheet(wb, wsByAge, 'С вік');
+
+            // ---------- Аркуш: С НЗ ----------
+            const bySchoolRows = sortBySchool(children).map((c, i) => ({
+                '№': i + 1,
+                'ПІБ': c.name || '',
+                'Новоприбулі': isNewLabel(c),
+                'Вік (років)': calcAge(c.bithday),
+                'Навчальний заклад': c.school?.title || '',
+                'Стать': genderUk(c),
+                'Група': getGroupName(c.group_id),
+                'Дата народження': formatDate(c.bithday),
+                'Мати': [c.mother, c.mother_telephone].filter(x => x && x !== '—').join(' '),
+                'Батько': [c.father, c.father_telephone].filter(x => x && x !== '—').join(' '),
+                'Домашня адреса': c.address || '',
+                'Категорія': c.category || ''
+            }));
+            const wsBySchool = XLSX.utils.json_to_sheet(bySchoolRows);
+            wsBySchool['!cols'] = generalCols;
+            XLSX.utils.book_append_sheet(wb, wsBySchool, 'С НЗ');
+
+            // ---------- Аркуш: Статистичні дані ----------
+            const statsRows = [];
+            statsRows.push({ A: 'СТАТИСТИЧНІ ДАНІ' });
+            statsRows.push({ A: currentClub?.title || '' });
+            statsRows.push({});
+            groupsList.forEach(g => {
+                const count = children.filter(c => c.group_id === g.id).length;
+                statsRows.push({ A: docGroupNames[g.title] || g.title, B: g.title, C: count });
+            });
+            statsRows.push({ A: 'Всього дітей в гуртку:', C: children.length });
+            const wsStats = XLSX.utils.json_to_sheet(statsRows);
+            wsStats['!cols'] = [{ wch: 25 }, { wch: 20 }, { wch: 22 }];
+            XLSX.utils.book_append_sheet(wb, wsStats, 'Статистичні дані');
+
+            // ---------- Аркуш: Соц. незах. ----------
+            const socialList = sortByBirthDesc(children.filter(c => c.socially_vulnerable === true));
+            const socialRows = socialList.map((c, i) => ({
+                '№': i + 1,
+                'ПІБ': c.name || '',
+                'Новоприбулі': isNewLabel(c),
+                'Дата народження': formatDate(c.bithday),
+                'Навчальний заклад': c.school?.title || '',
+                'Категорія': c.category || '',
+                'Домашня адреса': c.address || '',
+                'Дані про батьків/опікунів': formatParents(c)
+            }));
+            const wsSocial = XLSX.utils.json_to_sheet(socialRows);
+            wsSocial['!cols'] = [{ wch: 5 }, { wch: 32 }, { wch: 11 }, { wch: 15 }, { wch: 18 }, { wch: 30 }, { wch: 28 }, { wch: 40 }];
+            XLSX.utils.book_append_sheet(wb, wsSocial, 'Соц. незах.');
+
+            // ---------- Аркуш: ООП ----------
+            const oopList = sortByBirthDesc(children.filter(c => c.oop === true));
+            const oopRows = oopList.map((c, i) => ({
+                '№': i + 1,
+                'Новоприбулі': isNewLabel(c),
+                'ПІБ': c.name || '',
+                'Дата народження': formatDate(c.bithday),
+                'Навчальний заклад': c.school?.title || '',
+                'Категорія': c.category || '',
+                'Домашня адреса': c.address || '',
+                'Дані про батьків/опікунів': formatParents(c)
+            }));
+            const wsOop = XLSX.utils.json_to_sheet(oopRows);
+            wsOop['!cols'] = [{ wch: 5 }, { wch: 11 }, { wch: 32 }, { wch: 15 }, { wch: 18 }, { wch: 30 }, { wch: 28 }, { wch: 40 }];
+            XLSX.utils.book_append_sheet(wb, wsOop, 'ООП');
+
+            const fileName = (currentClub?.title || 'звіт_статистики').replace(/[\\/:*?"<>|]/g, '_');
+            XLSX.writeFile(wb, `${fileName}.xlsx`);
+        }
+
         async function logout() {
-            await customLogout();
+            if (typeof customLogout === 'function') await customLogout();
             window.location.href = 'index.html';
         }
 
@@ -740,6 +1470,7 @@
             currentUser = await checkAuthAndRedirect();
             if (!currentUser) return;
 
+            loadDocNamesIntoInputs();
             await loadDictionaries();
             const clubs = await loadUserClubs();
             renderClubSelect(clubs);
@@ -753,22 +1484,14 @@
                 const title = document.getElementById('new-club-title').value.trim();
                 if (!title) return;
                 try {
-                    const { data: newClubs, error: createError } = await supabaseClient
-                        .from('club')
-                        .insert([{ title }])
-                        .select();
+                    const { data: newClubs, error: createError } = await supabaseClient.from('club').insert([{ title }]).select();
                     if (createError) throw createError;
-                    if (!newClubs || newClubs.length === 0) throw new Error('Клуб не створено');
                     const newClub = newClubs[0];
-                    const { error: linkError } = await supabaseClient
-                        .from('user_club')
-                        .insert([{ user_id: currentUser.id, club_id: newClub.id }]);
-                    if (linkError) throw linkError;
+                    await supabaseClient.from('user_club').insert([{ user_id: currentUser.id, club_id: newClub.id }]);
                     document.getElementById('new-club-title').value = '';
                     currentClubId = newClub.id;
                     const updatedClubs = await loadUserClubs();
                     renderClubSelect(updatedClubs);
-                    alert('Клуб успішно створено!');
                 } catch (err) {
                     alert('Помилка створення клубу: ' + err.message);
                 }

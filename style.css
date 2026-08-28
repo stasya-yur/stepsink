@@ -117,7 +117,7 @@ body {
 
 /* Content Area */
 .content-area { flex: 1; padding: 20px; }
-.toolbar { display: flex; gap: 15px; margin-bottom: 20px; }
+.toolbar { display: flex; gap: 15px; margin-bottom: 20px; justify-content: flex-end; }
 .toolbar input { flex: 1; padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; }
 
 /* Table */
@@ -367,4 +367,35 @@ body {
     #printable-area, #printable-area * { visibility: visible; }
     #printable-area { position: absolute; left: 0; top: 0; width: 100%; }
     .toolbar, .left-sidebar, .app-header, .right-drawer { display: none !important; }
+}
+/* Додаткові покращені відступи для друкованих звітів */
+@media print {
+    @page {
+        margin: 15mm 10mm 15mm 10mm;
+    }
+    
+    .print-page {
+        page-break-after: always;
+        padding: 20px 15px !important;
+    }
+
+    .stats-hdr {
+        font-weight: bold;
+        font-size: 13pt;
+        text-align: center;
+        margin-bottom: 20px !important;
+        line-height: 1.4;
+    }
+
+    .print-table th, .print-table td {
+        padding: 5px 6px !important;
+    }
+
+    .print-summary-box {
+        margin-top: 15px !important;
+    }
+}
+.group-summary-footer{
+    display: flex;
+    gap: 20px
 }

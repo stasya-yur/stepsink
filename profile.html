@@ -53,6 +53,16 @@
     <script>
         let currentUser = null;
 
+        function escapeHtml(text) {
+            if (text === null || text === undefined) return '';
+            return String(text)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
         async function initProfile() {
             currentUser = await checkAuthAndRedirect();
             if (!currentUser) return;
@@ -93,7 +103,7 @@
             }
 
             if (clubs && clubs.length > 0) {
-                ul.innerHTML = clubs.map(c => `<li><i class="fa-solid fa-users-viewfinder"></i> <strong>${c.title}</strong> (ID: ${c.id})</li>`).join('');
+                ul.innerHTML = clubs.map(c => `<li><i class="fa-solid fa-users-viewfinder"></i> <strong>${escapeHtml(c.title)}</strong> (ID: ${c.id})</li>`).join('');
             } else {
                 ul.innerHTML = '<li>Немає підключених клубів</li>';
             }

@@ -61,10 +61,11 @@ function showError(msg) {
 function escapeHtml(text) {
     if (text === null || text === undefined) return '';
     return String(text)
-        .replace(/&/g, '&')
-        .replace(/</g, '<')
-        .replace(/>/g, '>')
-        .replace(/"/g, '"');
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 
 function formatDate(iso) {
@@ -596,25 +597,41 @@ function printDocument() {
     window.print();
 }
 
-// ===================== Експорт в Excel =====================
 function exportToExcel() {
-    if (typeof XLSX === 'undefined') { showError('Бібліотеку XLSX не завантажено. Перевірте інтернет-з\'єднання.'); return; }
-    if (!children.length) { showError('Немає даних для експорту'); return; }
-    const wb = XLSX.utils.book_new();
+    if (typeof XLSX === 'undefined') {
+        alert('Бібліотеку XLSX не завантажено. Перевірте інтернет-з\'єднання.');
+        return;
+    }
+    if (!rawStudentsData || !rawStudentsData.length) {
+        alert('Немає даних для експорту');
+        return;
+    }
 
-    // ---------- Аркуш: Загальний ----------
+    const wb = XLSX.utils.book_new();
+    const activeStudents = rawStudentsData.filter(s => s.arhive !== true);
+    
+    // Допоміжні функції внутрішньо для експорту
+    const sortByName = (list) => [...list].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    const formatParents = (c) => {
+        const m = [c.mother, c.mother_telephone].filter(x => x && x !== '—').join(' ');
+        const f = [c.father, c.father_telephone].filter(x => x && x !== '—').join(' ');
+        return [m ? `Мати: ${m}` : '', f ? `Батько: ${f}` : ''].filter(Boolean).join('; ');
+    };
+
     const generalCols = [{ wch: 5 }, { wch: 32 }, { wch: 11 }, { wch: 10 }, { wch: 18 }, { wch: 10 }, { wch: 12 }, { wch: 15 }, { wch: 34 }, { wch: 34 }, { wch: 28 }, { wch: 30 }];
-    const generalRows = sortByName(children).map((c, i) => ({
+
+    // 1. Аркуш: Загальний
+    const generalRows = sortByName(activeStudents).map((c, i) => ({
         '№': i + 1,
-        'ПІБ': c.full_name || '',
-        'Новоприбулі': isNewLabel(c),
-        'Вік (років)': c.birth_date ? calcAge(c.birth_date) : '',
-        'Навчальний заклад': c.school || '',
-        'Стать': genderUk(c),
-        'Група': getGroupName(c.group_id),
-        'Дата народження': formatDate(c.birth_date),
-        'Мати': c.mother || '',
-        'Батько': c.father || '',
+        'ПІБ': c.name || '',
+        'Новоприбулі': c.new ? 'н/п' : '',
+        'Вік (років)': c.bithday ? calculateAge(c.bithday) : '',
+        'Навчальний заклад': c.school?.title || '',
+        'Стать': c.sex?.title || '',
+        'Група': c.group?.title || '',
+        'Дата народження': formatDate(c.bithday),
+        'Мати': [c.mother, c.mother_telephone].filter(x => x && x !== '—').join(' '),
+        'Батько': [c.father, c.father_telephone].filter(x => x && x !== '—').join(' '),
         'Домашня адреса': c.address || '',
         'Категорія': c.category || ''
     }));
@@ -622,45 +639,49 @@ function exportToExcel() {
     wsGeneral['!cols'] = generalCols;
     XLSX.utils.book_append_sheet(wb, wsGeneral, 'Загальний');
 
-    // ---------- Аркуші груп ----------
-    getGroupsWithOrder().forEach(g => {
-        const list = sortByBirthDesc(children.filter(c => c.group_id === g.id));
+    // 2. Аркуші груп
+    const order = ['Підготовча', 'Молодша', 'Середня', 'Старша'];
+    const groupsList = [...dictionaries.group].sort((a, b) => order.indexOf(a.title) - order.indexOf(b.title));
+
+    groupsList.forEach(g => {
+        const list = sortByAge(activeStudents.filter(c => c.group_id === g.id));
         const rows = list.map((c, i) => ({
             'Індекс': i + 1,
-            'ПІБ': c.full_name || '',
-            'Новоприбулі': isNewLabel(c),
-            'Вік (років)': c.birth_date ? calcAge(c.birth_date) : '',
-            'Навчальний заклад': c.school || '',
-            'Стать': genderUk(c),
-            'Мати': c.mother || '',
-            'Батько': c.father || '',
+            'ПІБ': c.name || '',
+            'Новоприбулі': c.new ? 'н/п' : '',
+            'Вік (років)': c.bithday ? calculateAge(c.bithday) : '',
+            'Навчальний заклад': c.school?.title || '',
+            'Стать': c.sex?.title || '',
+            'Мати': [c.mother, c.mother_telephone].filter(x => x && x !== '—').join(' '),
+            'Батько': [c.father, c.father_telephone].filter(x => x && x !== '—').join(' '),
             'Домашня адреса': c.address || '',
             'Категорія': c.category || ''
         }));
-        const level = LEVEL_NAMES[g.name] || g.name;
+        
+        const docName = docGroupNames[g.title] || g.title;
         rows.push({
-            'Індекс': level,
-            'ПІБ': g.name,
+            'Індекс': docName,
+            'ПІБ': g.title,
             'Вік (років)': list.length,
             'Домашня адреса': 'дітей'
         });
         const ws = XLSX.utils.json_to_sheet(rows);
         ws['!cols'] = [{ wch: 18 }, { wch: 32 }, { wch: 11 }, { wch: 10 }, { wch: 18 }, { wch: 10 }, { wch: 34 }, { wch: 34 }, { wch: 28 }, { wch: 30 }];
-        XLSX.utils.book_append_sheet(wb, ws, g.name);
+        XLSX.utils.book_append_sheet(wb, ws, g.title);
     });
 
-    // ---------- Аркуш: С вік (за датою народження) ----------
-    const byAgeRows = sortByBirthDesc(children).map((c, i) => ({
+    // 3. Аркуш: С вік
+    const byAgeRows = sortByAge(activeStudents).map((c, i) => ({
         '№': i + 1,
-        'ПІБ': c.full_name || '',
-        'Новоприбулі': isNewLabel(c),
-        'Вік (років)': c.birth_date ? calcAge(c.birth_date) : '',
-        'Навчальний заклад': c.school || '',
-        'Стать': genderUk(c),
-        'Група': getGroupName(c.group_id),
-        'Дата народження': formatDate(c.birth_date),
-        'Мати': c.mother || '',
-        'Батько': c.father || '',
+        'ПІБ': c.name || '',
+        'Новоприбулі': c.new ? 'н/п' : '',
+        'Вік (років)': c.bithday ? calculateAge(c.bithday) : '',
+        'Навчальний заклад': c.school?.title || '',
+        'Стать': c.sex?.title || '',
+        'Група': c.group?.title || '',
+        'Дата народження': formatDate(c.bithday),
+        'Мати': [c.mother, c.mother_telephone].filter(x => x && x !== '—').join(' '),
+        'Батько': [c.father, c.father_telephone].filter(x => x && x !== '—').join(' '),
         'Домашня адреса': c.address || '',
         'Категорія': c.category || ''
     }));
@@ -668,18 +689,18 @@ function exportToExcel() {
     wsByAge['!cols'] = generalCols;
     XLSX.utils.book_append_sheet(wb, wsByAge, 'С вік');
 
-    // ---------- Аркуш: С НЗ (за навчальним закладом) ----------
-    const bySchoolRows = sortBySchool(children).map((c, i) => ({
+    // 4. Аркуш: С НЗ (за навчальним закладом)
+    const bySchoolRows = [...activeStudents].sort((a,b) => (a.school?.title || '').localeCompare(b.school?.title || '')).map((c, i) => ({
         '№': i + 1,
-        'ПІБ': c.full_name || '',
-        'Новоприбулі': isNewLabel(c),
-        'Вік (років)': c.birth_date ? calcAge(c.birth_date) : '',
-        'Навчальний заклад': c.school || '',
-        'Стать': genderUk(c),
-        'Група': getGroupName(c.group_id),
-        'Дата народження': formatDate(c.birth_date),
-        'Мати': c.mother || '',
-        'Батько': c.father || '',
+        'ПІБ': c.name || '',
+        'Новоприбулі': c.new ? 'н/п' : '',
+        'Вік (років)': c.bithday ? calculateAge(c.bithday) : '',
+        'Навчальний заклад': c.school?.title || '',
+        'Стать': c.sex?.title || '',
+        'Група': c.group?.title || '',
+        'Дата народження': formatDate(c.bithday),
+        'Мати': [c.mother, c.mother_telephone].filter(x => x && x !== '—').join(' '),
+        'Батько': [c.father, c.father_telephone].filter(x => x && x !== '—').join(' '),
         'Домашня адреса': c.address || '',
         'Категорія': c.category || ''
     }));
@@ -687,29 +708,38 @@ function exportToExcel() {
     wsBySchool['!cols'] = generalCols;
     XLSX.utils.book_append_sheet(wb, wsBySchool, 'С НЗ');
 
-    // ---------- Аркуш: С. за віком і статтю ----------
-    const byAgeGenderRows = sortByBirthDesc(children).map((c, i) => ({
+    // 5. Аркуш: Соц. незах.
+    const socialList = sortByAge(activeStudents.filter(c => c.socially_vulnerable === true));
+    const socialRows = socialList.map((c, i) => ({
         '№': i + 1,
-        'ПІБ': c.full_name || '',
-        'Вік (років)': c.birth_date ? calcAge(c.birth_date) : '',
-        'Навчальний заклад': c.school || '',
-        'Стать': genderUk(c),
-        'Група': getGroupName(c.group_id),
-        'Дата народження': formatDate(c.birth_date),
-        'Мати': c.mother || '',
-        'Батько': c.father || '',
+        'ПІБ': c.name || '',
+        'Новоприбулі': c.new ? 'н/п' : '',
+        'Дата народження': formatDate(c.bithday),
+        'Навчальний заклад': c.school?.title || '',
+        'Категорія': c.category || '',
         'Домашня адреса': c.address || '',
-        'Категорія': c.category || ''
+        'Дані про батьків/опікунів': formatParents(c)
     }));
-    const wsByAgeGender = XLSX.utils.json_to_sheet(byAgeGenderRows);
-    wsByAgeGender['!cols'] = generalCols;
-    XLSX.utils.book_append_sheet(wb, wsByAgeGender, 'С. за віком і статтю');
+    const wsSocial = XLSX.utils.json_to_sheet(socialRows);
+    wsSocial['!cols'] = [{ wch: 5 }, { wch: 32 }, { wch: 11 }, { wch: 15 }, { wch: 18 }, { wch: 30 }, { wch: 28 }, { wch: 40 }];
+    XLSX.utils.book_append_sheet(wb, wsSocial, 'Соц. незах.');
 
-    // ---------- Аркуш: Статистичні дані ----------
-    const stats = buildStatistics();
-    const statsRows = [];
-    statsRows.push({ A: 'СТАТИСТИЧНІ ДАНІ' });
-    const clubName = currentClub && currentClub.name ? currentClub.name : 'клубу бального танцю "Вікторія"';
-    statsRows.push({ A: clubName });
-    statsRows.push({});
-    stats.levelRows.forEach(r => statsRows.push({ A: r['Рівень навчання'], B: r['Назва групи'], C: r['Кількість дітей в групі'] }));
+    // 6. Аркуш: ООП
+    const oopList = sortByAge(activeStudents.filter(c => c.oop === true));
+    const oopRows = oopList.map((c, i) => ({
+        '№': i + 1,
+        'Новоприбулі': c.new ? 'н/п' : '',
+        'ПІБ': c.name || '',
+        'Дата народження': formatDate(c.bithday),
+        'Навчальний заклад': c.school?.title || '',
+        'Категорія': c.category || '',
+        'Домашня адреса': c.address || '',
+        'Дані про батьків/опікунів': formatParents(c)
+    }));
+    const wsOop = XLSX.utils.json_to_sheet(oopRows);
+    wsOop['!cols'] = [{ wch: 5 }, { wch: 11 }, { wch: 32 }, { wch: 15 }, { wch: 18 }, { wch: 30 }, { wch: 28 }, { wch: 40 }];
+    XLSX.utils.book_append_sheet(wb, wsOop, 'ООП');
+
+    const fileName = (currentClub?.title || 'звіт_статистики').replace(/[\\/:*?"<>|]/g, '_');
+    XLSX.writeFile(wb, `${fileName}.xlsx`);
+}
