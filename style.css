@@ -362,40 +362,156 @@ body {
 }
 
 /* Друк */
-@media print {
-    body * { visibility: hidden; }
-    #printable-area, #printable-area * { visibility: visible; }
-    #printable-area { position: absolute; left: 0; top: 0; width: 100%; }
-    .toolbar, .left-sidebar, .app-header, .right-drawer { display: none !important; }
-}
-/* Додаткові покращені відступи для друкованих звітів */
-@media print {
-    @page {
-        margin: 15mm 10mm 15mm 10mm;
-    }
-    
-    .print-page {
-        page-break-after: always;
-        padding: 20px 15px !important;
-    }
 
-    .stats-hdr {
-        font-weight: bold;
-        font-size: 13pt;
-        text-align: center;
-        margin-bottom: 20px !important;
-        line-height: 1.4;
-    }
-
-    .print-table th, .print-table td {
-        padding: 5px 6px !important;
-    }
-
-    .print-summary-box {
-        margin-top: 15px !important;
-    }
-}
 .group-summary-footer{
     display: flex;
     gap: 20px
+}
+
+/* ===================== АДАПТИВНІСТЬ (Responsive Design) ===================== */
+
+/* Планшети та невеликі ноутбуки (до 1024px) */
+@media (max-width: 1024px) {
+    .left-sidebar { width: 180px; }
+    .modal-content { width: 90%; }
+    .form-row-4 { grid-template-columns: 1fr 1fr; }
+    .form-col-span-4 { grid-column: span 2; }
+}
+
+/* Мобільні пристрої (до 767px) */
+@media (max-width: 767px) {
+    /* Auth сторінка */
+    .auth-wrapper {
+        height: auto;
+        min-height: 100vh;
+        min-height: 100dvh;
+        padding: 20px;
+    }
+    .auth-container {
+        width: 100%;
+        max-width: 350px;
+        padding: 20px;
+    }
+
+    /* Шапка */
+    .app-header {
+        padding: 12px 15px;
+    }
+    .app-header h1 { font-size: 18px; }
+    .app-header h2 { font-size: 14px; }
+
+    /* Layout: бічна панель стає горизонтальною */
+    .main-layout {
+        flex-direction: column;
+    }
+    .left-sidebar {
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid #e1e8ed;
+        padding: 0;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+    .left-sidebar::-webkit-scrollbar { display: none; }
+    .nav-tabs {
+        flex-direction: row;
+    }
+    .nav-tabs hr { display: none; }
+    .tab-btn {
+        white-space: nowrap;
+        padding: 10px 15px;
+        border-left: none !important;
+        border-bottom: 3px solid transparent;
+        width: auto;
+        flex-shrink: 0;
+    }
+    .tab-btn:hover, .tab-btn.active {
+        border-left: none !important;
+        border-bottom: 3px solid #1e3799;
+    }
+
+    /* Панель інструментів */
+    .toolbar {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .toolbar .btn {
+        flex: 1 1 auto;
+        justify-content: center;
+        font-size: 13px;
+        padding: 8px 12px;
+    }
+
+    /* Контент */
+    .content-area { padding: 12px; }
+
+    /* Фільтри */
+    .filter-grid { grid-template-columns: 1fr !important; }
+    .filter-item { min-width: 0; }
+
+    /* Таблиця */
+    .table-container { padding: 12px; }
+
+    /* Модальні вікна */
+    .modal-content {
+        width: 95%;
+        padding: 15px;
+        max-height: 92vh;
+    }
+    .modal-footer { flex-wrap: wrap; }
+    .modal-footer .btn { flex: 1 1 auto; justify-content: center; }
+
+    /* Форма учня */
+    .student-form-grid,
+    .form-row-2,
+    .form-row-4,
+    .form-row-2col {
+        grid-template-columns: 1fr !important;
+    }
+    .form-col-span-2,
+    .form-col-span-4 { grid-column: span 1 !important; }
+
+    /* Поле з перемикачем */
+    .field-with-toggle {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+    }
+    .field-with-toggle > .toggle-part { padding-bottom: 0; }
+
+    /* Група перемикачів */
+    .toggle-group { gap: 12px; }
+
+    /* Рядок з полем */
+    .field-row-inline {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+    }
+
+    /* Висувна панель */
+    .right-drawer { width: 85%; max-width: 300px; }
+
+    /* Профіль */
+    .profile-container { margin: 15px; }
+    .card { padding: 15px; }
+
+    /* Підсумок групи */
+    .group-summary-footer { flex-wrap: wrap; width: 100% !important; }
+    .group-summary-footer div { flex: 1 1 auto; }
+
+    /* Статистика */
+    .stats-block-title { font-size: 14px; }
+}
+
+/* Дуже малі екрани (до 480px) */
+@media (max-width: 480px) {
+    .auth-container { padding: 15px; }
+    .right-drawer { width: 100%; }
+    .app-header h1 { font-size: 16px; }
+    .app-header h2 { font-size: 13px; }
+    .toolbar .btn { font-size: 12px; padding: 8px 10px; }
+    .profile-container { margin: 10px; }
+    #add-club-form { flex-direction: column; }
 }

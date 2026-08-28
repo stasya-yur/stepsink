@@ -10,7 +10,6 @@
     <script src="supabase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body>
 
@@ -457,8 +456,8 @@
             { title: 'Школа № 19', match: ['школа № 19', 'школа №19', 'школа 19'] },
             { title: 'Школа № 20', match: ['школа № 20', 'школа №20', 'школа 20'] },
             { title: 'Д/с', match: ['д/с', 'д/садок', 'садок', 'дошкільний'] },
-            { title: 'Інший заклад освіти', match: ['інший заклад освіти', 'інше', 'інший'] },
-            { title: 'Не відвідує закладів', match: ['не відвідує закладів', 'не відвідує', '—', ''] }
+            { title: 'Інше', match: ['інший заклад освіти', 'інше', 'інший'] },
+            { title: 'Не відвідує', match: ['не відвідує закладів', 'не відвідує', '—', ''] }
         ];
 
         function getSchoolCount(activeStudents, schoolConfig) {
@@ -866,7 +865,7 @@
 
             let html = `
                 <div style="max-width: 950px; margin: 0 auto;">
-                <div class="stats-block-title">StepSync Manager — СТАТИСТИЧНІ ДАНІ<br>${currentClub?.title || ''}</div>
+                <div class="stats-block-title">СТАТИСТИЧНІ ДАНІ<br>${currentClub?.title || ''}</div>
                 <table class="data-table" style="margin-bottom: 25px;">
                     <thead>
                         <tr><th>Рівень навчання</th><th>Назва групи</th><th>Кількість дітей в групі</th></tr>
@@ -1227,7 +1226,7 @@
             }).length;
 
             html += `<div class="print-page">
-                <div class="stats-hdr">StepSync Manager — СТАТИСТИЧНІ ДАНІ<br>${currentClub?.title || ''}</div>
+                <div class="stats-hdr">СТАТИСТИЧНІ ДАНІ<br>${currentClub?.title || ''}</div>
                 <table class="print-table">
                     <thead><tr><th>Рівень навчання</th><th>Назва групи</th><th>Кількість дітей в групі</th></tr></thead>
                     <tbody>
