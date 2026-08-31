@@ -461,29 +461,36 @@
         ];
 
         function getSchoolCount(activeStudents, schoolConfig) {
-    if (schoolConfig.title === 'Не відвідує закладів') {
-        return activeStudents.filter(s => {
-            // 1. Приведение к числу/строке или нестрогое сравнение (учитывает "1" и 1)
-            const isNoSchoolId = Number(s.school_id) === 1 || s.school_id == 1;
-            
-            // 2. Учитываем случаи, когда объекта school нет или у него нет title
-            const hasNoSchoolObj = !s.school || !s.school.title || s.school.title.trim() === '';
-            
-            // 3. Учитываем текстовые совпадения ("не відвідує" в title, если school заполнен)
-            const titleMatches = s.school?.title?.toLowerCase().includes('не відвідує');
+    if (!Array.isArray(activeStudents) || !schoolConfig) return 0;
 
-            return isNoSchoolId || hasNoSchoolObj || titleMatches;
+    // Приводим title к единому формату для надежного сравнения
+    const configTitle = String(schoolConfig.title || '').trim().toLowerCase();
+    
+    // ПРОВЕРКА: Относится ли этот конфиг к категории "Не отсеивается / Не посещает"
+    const isNoSchoolConfig = configTitle.includes('не відвідує') || configTitle.includes('не отвідує');
+
+    if (isNoSchoolConfig) {
+        return activeStudents.filter(s => {
+            // Сравниваем приведённый к строке ID
+            return String(s.school_id).trim() === '1';
         }).length;
     }
 
+    // Для всех остальных школ:
     return activeStudents.filter(s => {
-        // Пропускаем тех, кто не ходит в заведения, чтобы они случайно не попали в другие школы
-        if (Number(s.school_id) === 1 || !s.school || !s.school.title) {
-            return false;
-        }
+        // Пропускаем тех, у кого school_id == 1
+        if (String(s.school_id).trim() === '1') return false;
+
+        // Если объекта school нет, студент не попадет ни в одну из обычных школ
+        if (!s.school || !s.school.title) return false;
 
         const schoolTitle = s.school.title.trim().toLowerCase();
-        return schoolConfig.match.some(m => schoolTitle === m || schoolTitle.includes(m));
+        if (!Array.isArray(schoolConfig.match)) return false;
+
+        return schoolConfig.match.some(m => {
+            const matchTerm = String(m).trim().toLowerCase();
+            return matchTerm && (schoolTitle === matchTerm || schoolTitle.includes(matchTerm));
+        });
     }).length;
 }
 
