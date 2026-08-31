@@ -436,63 +436,36 @@
             'Старша': localStorage.getItem('doc_senior') || 'Вищий, 3 рік'
         };
 
-        const SCHOOL_COLUMNS_CONFIG = [
-            { title: 'Школа № 1', match: ['школа № 1', 'школа №1', 'школа 1'] },
-            { title: 'Школа № 2', match: ['школа № 2', 'школа №2', 'школа 2'] },
-            { title: 'Школа № 3', match: ['школа № 3', 'школа №3', 'школа 3'] },
-            { title: 'Школа № 4', match: ['школа № 4', 'школа №4', 'школа 4'] },
-            { title: 'Школа № 5', match: ['школа № 5', 'школа №5', 'школа 5'] },
-            { title: 'Школа № 6', match: ['школа № 6', 'школа №6', 'школа 6'] },
-            { title: 'Школа № 7', match: ['школа № 7', 'школа №7', 'школа 7'] },
-            { title: 'Школа № 8', match: ['школа № 8', 'школа №8', 'школа 8'] },
-            { title: 'Школа № 9', match: ['школа № 9', 'школа №9', 'школа 9'] },
-            { title: 'Міський ліцей', match: ['міський ліцей', 'ПМЛ'] },
-            { title: 'Школа № 11', match: ['школа № 11', 'школа №11', 'школа 11'] },
-            { title: 'Школа № 12', match: ['школа № 12', 'школа №12', 'школа 12'] },
-            { title: 'Школа № 14', match: ['школа № 14', 'школа №14', 'школа 14'] },
-            { title: 'Школа № 15', match: ['школа № 15', 'школа №15', 'школа 15'] },
-            { title: 'Школа № 17', match: ['школа № 17', 'школа №17', 'школа 17'] },
-            { title: 'Школа № 18', match: ['школа № 18', 'школа №18', 'школа 18'] },
-            { title: 'Школа № 19', match: ['школа № 19', 'школа №19', 'школа 19'] },
-            { title: 'Школа № 20', match: ['школа № 20', 'школа №20', 'школа 20'] },
-            { title: 'Д/с', match: ['д/с', 'д/садок', 'садок', 'дошкільний'] },
-            { title: 'Інше', match: ['інший заклад освіти', 'інше', 'інший'] },
-            { title: 'Не відвідує', match: ['не відвідує закладів', 'не відвідує', '—', ''] }
-        ];
+            const SCHOOL_COLUMNS_CONFIG = [
+        { title: 'Школа № 1', id: 5 },
+        { title: 'Школа № 2', id: 6 },
+        { title: 'Школа № 3', id: 7 },
+        { title: 'Школа № 4', id: 8 },
+        { title: 'Школа № 5', id: 9 },
+        { title: 'Школа № 6', id: 10 },
+        { title: 'Школа № 7', id: 11 },
+        { title: 'Школа № 8', id: 12 },
+        { title: 'Школа № 9', id: 13 },
+        { title: 'Міський ліцей', id: 4 },
+        { title: 'Школа № 11', id: 14 },
+        { title: 'Школа № 12', id: 15 },
+        { title: 'Школа № 14', id: 16 },
+        { title: 'Школа № 15', id: 17 },
+        { title: 'Школа № 17', id: 18 },
+        { title: 'Школа № 18', id: 19 },
+        { title: 'Школа № 19', id: 20 },
+        { title: 'Школа № 20', id: 21 },
+        { title: 'д/с', id: 2 },
+        { title: 'Інше', id: 3 },
+        { title: 'Не відвідує', id: 1 }
+    ];
 
-        function getSchoolCount(activeStudents, schoolConfig) {
-    if (!Array.isArray(activeStudents) || !schoolConfig) return 0;
+    function getSchoolCount(activeStudents, schoolConfig) {
+        if (!Array.isArray(activeStudents) || !schoolConfig || schoolConfig.id === undefined) return 0;
 
-    // Приводим title к единому формату для надежного сравнения
-    const configTitle = String(schoolConfig.title || '').trim().toLowerCase();
-    
-    // ПРОВЕРКА: Относится ли этот конфиг к категории "Не отсеивается / Не посещает"
-    const isNoSchoolConfig = configTitle.includes('не відвідує') || configTitle.includes('не отвідує');
-
-    if (isNoSchoolConfig) {
-        return activeStudents.filter(s => {
-            // Сравниваем приведённый к строке ID
-            return String(s.school_id).trim() === '1';
-        }).length;
+        // Просто фильтруем по ID из базы
+        return activeStudents.filter(s => Number(s.school_id) === Number(schoolConfig.id)).length;
     }
-
-    // Для всех остальных школ:
-    return activeStudents.filter(s => {
-        // Пропускаем тех, у кого school_id == 1
-        if (String(s.school_id).trim() === '1') return false;
-
-        // Если объекта school нет, студент не попадет ни в одну из обычных школ
-        if (!s.school || !s.school.title) return false;
-
-        const schoolTitle = s.school.title.trim().toLowerCase();
-        if (!Array.isArray(schoolConfig.match)) return false;
-
-        return schoolConfig.match.some(m => {
-            const matchTerm = String(m).trim().toLowerCase();
-            return matchTerm && (schoolTitle === matchTerm || schoolTitle.includes(matchTerm));
-        });
-    }).length;
-}
 
         function calculateAge(birthdayStr) {
             if (!birthdayStr) return null;
