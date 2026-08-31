@@ -4,7 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StepSync Manager</title>
-    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <!-- Основная SVG иконка (для современных браузеров) -->
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+
+<!-- Резервная ICO иконка (для старых браузеров и систем) -->
+<link rel="icon" href="/favicon.ico" sizes="any">
+
+<!-- Иконка для закладки на экране iPhone/iPad -->
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -16,6 +23,7 @@
 
     <header class="app-header">
         <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+            <img src="favicon.svg" alt="Логотип сайта" width="40" height="40">
             <h1 style="margin: 0; font-size: 20px;">StepSync Manager</h1>
             <span style="opacity: 0.5;">|</span>
             <h2 id="current-club-title" style="margin: 0; font-size: 16px; font-weight: normal;">Завантаження...</h2>
@@ -48,6 +56,9 @@
                 </button>
                 <button class="btn btn-secondary" onclick="printDocument()"><i class="fa-solid fa-print"></i> Друк / Зберегти PDF</button>
                 <button class="btn btn-success" onclick="exportToExcel()"><i class="fa-solid fa-file-excel"></i> Експортувати в Excel</button>
+                <button class="btn btn-secondary" onclick="clearAllNewFlags()" title="Зняти відмітку «н/п» (Новоприбулі) у всіх учнів поточного гуртка">
+                    <i class="fa-solid fa-user-slash"></i> Зняти «н/п» всім
+                </button>
             </div>
 
             <!-- Панель Фільтрації та Пошуку -->
@@ -677,6 +688,31 @@
             if (error) { console.error("Помилка завантаження:", error); return; }
             rawStudentsData = students || [];
             renderTable();
+        }
+
+        // Зняти відмітку «н/п» (Новоприбулі) у всіх учнів поточного гуртка (робить new = false)
+        async function clearAllNewFlags() {
+            if (!currentClubId) { alert('Спочатку оберіть гурток'); return; }
+
+            const flagged = rawStudentsData.filter(s => s.new === true);
+            if (flagged.length === 0) {
+                alert('Немає учнів з відміткою «н/п».');
+                return;
+            }
+
+            const word = flagged.length === 1 ? 'учня' : 'учнів';
+            if (!confirm(`Зняти відмітку «н/п» у ${flagged.length} ${word}? Цю дію неможливо скасувати.`)) return;
+
+            const ids = flagged.map(s => s.id);
+            const { error } = await supabaseClient.from('students').update({ new: false }).in('id', ids);
+            if (error) {
+                alert('Помилка оновлення: ' + error.message);
+                return;
+            }
+
+            flagged.forEach(s => s.new = false);
+            renderTable();
+            alert(`Відмітку «н/п» знято у ${flagged.length} ${word}.`);
         }
 
         function switchTab(tab, btn) {

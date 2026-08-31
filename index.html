@@ -18,7 +18,11 @@
         </div>
 
         <form id="login-form" class="auth-form active-form">
-            <h2>Вхід у систему</h2>
+            <div style="display: flex; align-items: center; gap: 10px; padding-bottom: 10px; justify-content: center;">
+                <img src="favicon.svg" alt="Логотип сайта" width="40" height="40">
+                <h2>Вхід у систему</h2>
+            </div>
+            
             <div class="form-group">
                 <label>Логін</label>
                 <input type="text" id="login-login" required>
@@ -27,11 +31,15 @@
                 <label>Пароль</label>
                 <input type="password" id="login-password" required>
             </div>
-            <button type="submit" class="btn btn-primary w-full">Увійти</button>
+            <button type="submit" class="btn btn-primary w-full" style="display: flex; justify-content: center; padding: 10px;">Увійти</button>
         </form>
 
         <form id="register-form" class="auth-form">
-            <h2>Реєстрація</h2>
+            
+            <div style="display: flex; align-items: center; gap: 10px; padding-bottom: 10px; justify-content: center;">
+                <img src="favicon.svg" alt="Логотип сайта" width="40" height="40">
+                <h2>Реєстрація</h2>
+            </div>
             <div class="form-group">
                 <label>Логін</label>
                 <input type="text" id="reg-login" required>
@@ -44,7 +52,7 @@
                 <label>Підтвердження пароля</label>
                 <input type="password" id="reg-password-confirm" required>
             </div>
-            <button type="submit" class="btn btn-primary w-full">Зареєструватися</button>
+            <button type="submit" class="btn btn-primary w-full" style="display: flex; justify-content: center; padding: 10px;">Зареєструватися</button>
         </form>
     </div>
 
