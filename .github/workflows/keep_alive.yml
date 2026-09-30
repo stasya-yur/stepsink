@@ -1,7 +1,10 @@
 name: Keep Supabase Alive
+
 on:
   schedule:
+    # Запуск щодня о 12:00 за Гринвічем (UTC)
     - cron: '0 12 * * *'
+  # Дозволяє також запустити будильник вручну кнопкою на GitHub
   workflow_dispatch:
 
 jobs:
@@ -11,5 +14,5 @@ jobs:
       - name: Send keep-alive request to Supabase
         run: |
           curl -i -X GET "${{ secrets.SUPABASE_URL }}/rest/v1/" \
-          -H "apikey: ${{secrets.SUPABASE_ANON_KEY}}"\
+          -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
           -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}"
